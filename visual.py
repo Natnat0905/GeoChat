@@ -3,6 +3,7 @@ import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import Response
 import logging
 
 # Initialize the FastAPI app
@@ -25,24 +26,24 @@ def get_gpt_response(user_message: str) -> str:
     Includes structured prompting to ensure accurate geometry explanations.
     """
     try:
-        prompt = (
-            "You are a geometry tutor for grades 7-10. "
-            "Answer the user's query with clear explanations, step-by-step solutions, "
-            "and use simple language. If relevant, include examples.\n\n"
-            f"User: {user_message}\n"
-            "Tutor:"
-        )
+        # Structured messages for the GPT chat model
+        messages = [
+            {"role": "system", "content": "You are a geometry tutor for grades 7-10."},
+            {"role": "user", "content": user_message}
+        ]
+
+        # Call OpenAI's ChatCompletion endpoint
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": prompt}],
+            messages=messages,
             max_tokens=500,
             temperature=0.7
         )
-        return response.choices[0].message.content.strip()
+        return response["choices"][0]["message"]["content"].strip()
     except Exception as e:
         logging.error(f"Error communicating with OpenAI: {e}")
         return "Sorry, I encountered an error. Please try again."
-
+    
 # Root route for health check or welcome message
 @app.get("/")
 async def root():
@@ -59,12 +60,11 @@ async def chat_with_bot(message: Message):
     return {"response": response}
 
 # Favicon route (optional)
-@app.get("/favicon.ico")
+@app.get("/favicon.ico", response_class=Response)
 async def favicon():
     logging.info("Favicon endpoint accessed")
-    # Serve a blank or placeholder favicon
-    return FileResponse("path_to_your_favicon.ico")
-
+    # Return an empty response for favicon.ico
+    return Response(status_code=204)
 # Robots.txt handler
 @app.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt():
