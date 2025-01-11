@@ -29,10 +29,6 @@ class Message(BaseModel):
 
 # Function to interact with OpenAI's GPT
 def get_gpt_response(user_message: str) -> str:
-    """
-    Send the user's message to GPT and return its response.
-    Includes structured prompting to ensure accurate geometry explanations.
-    """
     try:
         # Structured messages for the GPT chat model
         messages = [
@@ -49,8 +45,10 @@ def get_gpt_response(user_message: str) -> str:
         )
         return response["choices"][0]["message"]["content"].strip()
     except Exception as e:
-        logging.error(f"Error communicating with OpenAI: {e}")
-        return "Sorry, I encountered an error. Please try again."
+        # Log detailed error information
+        logging.error(f"Error communicating with OpenAI: {str(e)}")
+        return f"Sorry, I encountered an error: {str(e)}"
+
 
 # Middleware to log all incoming requests
 @app.middleware("http")
