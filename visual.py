@@ -129,7 +129,7 @@ async def chat_with_bot(message: Message):
 
         # Check if the question is math-related
         if not is_math_related(user_message):
-            non_math_response = "I can only assist with math-related questions. Please ask me something about mathematics."
+            non_math_response = "I can only assist with math-related questions, especially GEOMETRY. Please ask me something about mathematics."
             logging.info(f"Non-math question detected. Response: {non_math_response}")
             return {"response": non_math_response}
 
