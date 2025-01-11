@@ -1,5 +1,6 @@
 import openai
 import os
+import re
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.responses import FileResponse, PlainTextResponse, Response
@@ -27,13 +28,61 @@ openai.api_key = os.getenv("OPENAI_API_KEY")  # Ensure this is set in Railway's 
 class Message(BaseModel):
     user_message: str
 
+# Function to check if a message is math-related
+def is_math_related(user_message: str) -> bool:
+    """
+    Check if the user's message is math-related using keywords and patterns.
+    """
+    math_keywords = [
+        "triangle", "geometry", "area", "perimeter", "angle", "algebra",
+        "equation", "square", "circle", "radius", "pi", "hypotenuse", "theorem",
+        "sum", "difference", "product", "quotient", "divide", "multiply",
+        "add", "subtract", "math", "mathematics", "Pythagorean"
+    ]
+
+    # Convert the message to lowercase for case-insensitive matching
+    user_message = user_message.lower()
+
+    # Check if any math-related keyword exists in the message
+    return any(keyword in user_message for keyword in math_keywords)
+
+# Post-processing function to clean LaTeX-style output
+def convert_to_plain_math(response: str) -> str:
+    """
+    Convert LaTeX-style math expressions in the GPT response to plain text math symbols.
+    """
+    replacements = {
+        r"\\\(": "",  # Remove \( (opening LaTeX math delimiter)
+        r"\\\)": "",  # Remove \) (closing LaTeX math delimiter)
+        r"\^2": "²",  # Replace ^2 with superscript ²
+        r"\^3": "³",  # Replace ^3 with superscript ³
+        r"\sqrt": "√",  # Replace \sqrt with √
+        r"\\times": "×",  # Replace \times with ×
+        r"\\div": "÷",  # Replace \div with ÷
+        r"\\frac{(\d+)}{(\d+)}": r"(\1/\2)",  # Replace fractions \frac{a}{b} with (a/b)
+        r"\\[a-zA-Z]+": "",  # Remove any other unhandled LaTeX commands
+    }
+    for pattern, replacement in replacements.items():
+        response = re.sub(pattern, replacement, response)
+
+    # Additional cleanup: remove double backslashes
+    response = response.replace("\\", "")
+    return response.strip()
+
 # Function to interact with OpenAI's GPT
 def get_gpt_response(user_message: str) -> str:
     try:
         # Structured messages for the GPT chat model
         messages = [
-            {"role": "system", "content": "You are a geometry tutor for grades 7-10."},
-            {"role": "user", "content": user_message}
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful geometry tutor. Respond to mathematical questions using plain text "
+                    "mathematical symbols (e.g., use ² for squared, √ for square root, × for multiplication, etc.). "
+                    "Avoid using LaTeX-style expressions."
+                ),
+            },
+            {"role": "user", "content": user_message},
         ]
 
         # Call OpenAI's ChatCompletion endpoint
@@ -41,14 +90,17 @@ def get_gpt_response(user_message: str) -> str:
             model="gpt-3.5-turbo",
             messages=messages,
             max_tokens=500,
-            temperature=0.7
+            temperature=0.7,
         )
-        return response["choices"][0]["message"]["content"].strip()
+
+        # Extract GPT response and process it
+        raw_response = response["choices"][0]["message"]["content"].strip()
+        processed_response = convert_to_plain_math(raw_response)  # Post-process the response
+        return processed_response
     except Exception as e:
         # Log detailed error information
         logging.error(f"Error communicating with OpenAI: {str(e)}")
         return f"Sorry, I encountered an error: {str(e)}"
-
 
 # Middleware to log all incoming requests
 @app.middleware("http")
@@ -69,40 +121,22 @@ async def root():
 async def chat_with_bot(message: Message):
     """
     Endpoint to interact with the chatbot.
-    Accepts a POST request with the user's message.
+    Only processes math-related questions.
     """
     try:
         user_message = message.user_message
         logging.info(f"Received message: {user_message}")
+
+        # Check if the question is math-related
+        if not is_math_related(user_message):
+            non_math_response = "I can only assist with math-related questions. Please ask me something about mathematics."
+            logging.info(f"Non-math question detected. Response: {non_math_response}")
+            return {"response": non_math_response}
+
+        # Process math-related questions using GPT
         response = get_gpt_response(user_message)
         logging.info(f"Response: {response}")
         return {"response": response}
     except Exception as e:
         logging.error(f"Error processing message: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-# Favicon route (optional)
-@app.get("/favicon.ico", response_class=Response)
-async def favicon():
-    logging.info("Favicon endpoint accessed")
-    # Return an empty response for favicon.ico
-    return Response(status_code=204)
-
-# Robots.txt handler
-@app.get("/robots.txt", response_class=PlainTextResponse)
-async def robots_txt():
-    """
-    Handle requests for robots.txt to prevent crawler errors.
-    """
-    logging.info("robots.txt endpoint accessed")
-    return "User-agent: *\nDisallow: /"
-
-# Custom 404 handler for unmatched routes
-@app.exception_handler(HTTPException)
-async def custom_404_handler(request: Request, exc: HTTPException):
-    """
-    Custom handler for 404 errors to improve debugging.
-    """
-    if exc.status_code == 404:
-        logging.warning(f"404 Error: {request.url}")
-    return {"error": "The requested resource was not found."}
