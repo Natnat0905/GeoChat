@@ -37,7 +37,10 @@ def is_math_related(user_message: str) -> bool:
         "triangle", "geometry", "area", "perimeter", "angle", "algebra",
         "equation", "square", "circle", "radius", "pi", "hypotenuse", "theorem",
         "sum", "difference", "product", "quotient", "divide", "multiply",
-        "add", "subtract", "math", "mathematics", "Pythagorean"
+        "add", "subtract", "math", "mathematics", "Pythagorean", "arithmetic",
+        "numbers", "integers", "fractions", "decimals", "percentages", "ratios",
+        "proportions", "square root", "cube root", "minus", "multiply", "multiplying", "dividing"
+         
     ]
 
     # Convert the message to lowercase for case-insensitive matching
@@ -77,9 +80,9 @@ def get_gpt_response(user_message: str) -> str:
             {
                 "role": "system",
                 "content": (
-                    "You are a helpful geometry tutor. Respond to mathematical questions using plain text "
-                    "mathematical symbols (e.g., use ² for squared, √ for square root, × for multiplication, etc.). "
-                    "Avoid using LaTeX-style expressions."
+                    "You are a math and arithmetic tutor. Respond only to math-related queries, "
+                    "explaining terms and arithmetic operations clearly. Use plain text symbols (e.g., "
+                    "² for squared, √ for square root, × for multiplication). Avoid answering non-math questions."
                 ),
             },
             {"role": "user", "content": user_message},
@@ -114,7 +117,7 @@ async def log_requests(request: Request, call_next):
 @app.get("/")
 async def root():
     logging.info("Root endpoint accessed")
-    return {"message": "Welcome to the GeoChat API - Geometry Helper!"}
+    return {"message": "Welcome to the Math and Arithmetic Tutor API!"}
 
 # Chatbot interaction endpoint
 @app.post("/chat")
@@ -129,7 +132,7 @@ async def chat_with_bot(message: Message):
 
         # Check if the question is math-related
         if not is_math_related(user_message):
-            non_math_response = "I can only assist with math-related questions, especially GEOMETRY. Please ask me something about mathematics."
+            non_math_response = "I can only assist with math-related questions. Please ask about mathematics or arithmetic."
             logging.info(f"Non-math question detected. Response: {non_math_response}")
             return {"response": non_math_response}
 
