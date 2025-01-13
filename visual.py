@@ -33,21 +33,38 @@ def is_math_related(user_message: str) -> bool:
     """
     Check if the user's message is math-related using keywords and patterns.
     """
-    math_keywords = [
-        "triangle", "geometry", "area", "perimeter", "angle", "algebra",
-        "equation", "square", "circle", "radius", "pi", "hypotenuse", "theorem",
-        "sum", "difference", "product", "quotient", "divide", "multiply",
-        "add", "subtract", "math", "mathematics", "Pythagorean", "arithmetic",
-        "numbers", "integers", "fractions", "decimals", "percentages", "ratios",
-        "proportions", "square root", "cube root", "minus", "multiply", "multiplying", "dividing"
-         
+    math_symbols = [
+        "+", "-", "*", "/", "=", "^", "%", "π", "∑", "√", "∫", "≠", "<", ">", "≤", "≥", "≈", "∼", "∝", "∞",
+        "!", "∂", "Δ", "∇", "∩", "∪", "⊂", "⊃", "⊆", "⊇", "⊕", "⊗", "∴", "∵", "±", "∓", "|", "∣", "∥", "⊥",
+        "→", "↔", "↦", "⇒", "⇔", "∈", "∉", "∋", "∀", "∃", "∅", "∓", "∖", "ℝ", "ℤ", "ℚ", "ℕ", "ℂ", "ℙ", "÷","×"
+                ]
+    
+    geometry_keywords = [
+        "triangle", "geometry", "area", "perimeter", "angle", "isosceles",
+        "equilateral", "scalene", "acute", "obtuse", "right triangle",
+        "circle", "radius", "diameter", "chord", "arc", "sector",
+        "circumference", "square", "rectangle", "parallelogram",
+        "rhombus", "trapezoid", "quadrilateral", "polygon", "pentagon",
+        "hexagon", "octagon", "surface area", "volume", "prism", "pyramid",
+        "sphere", "cone", "cylinder", "base", "height", "altitude",
+        "Pythagorean theorem", "midpoint", "distance formula",
+        "slope", "coordinate plane", "axes", "x-axis", "y-axis", "origin",
+        "geometry problem", "geometry tutor", "7th grade", "8th grade",
+        "9th grade", "10th grade", "line segment", "congruent",
+        "similar", "scale factor", "ratio", "proportions", "adjacent",
+        "opposite", "hypotenuse", "angles", "degrees", "radians",
+        "tan", "sin", "cos", "sec", "cosec", "cot", "logarithm", "log",
+        "factorial"
     ]
+
+    # Combine math symbols and geometry-related keywords
+    math_related_keywords = math_symbols + geometry_keywords
 
     # Convert the message to lowercase for case-insensitive matching
     user_message = user_message.lower()
 
-    # Check if any math-related keyword exists in the message
-    return any(keyword in user_message for keyword in math_keywords)
+    # Check if any math-related keyword or symbol exists in the message
+    return any(keyword in user_message for keyword in math_related_keywords)
 
 # Post-processing function to clean LaTeX-style output
 def convert_to_plain_math(response: str) -> str:
@@ -80,9 +97,10 @@ def get_gpt_response(user_message: str) -> str:
             {
                 "role": "system",
                 "content": (
-                    "You are a math and arithmetic tutor. Respond only to math-related queries, "
-                    "explaining terms and arithmetic operations clearly. Use plain text symbols (e.g., "
-                    "² for squared, √ for square root, × for multiplication). Avoid answering non-math questions."
+                    "You are a geometry tutor for grades 7 to 10. Focus on explaining geometry concepts "
+                    "such as angles, shapes, theorems, coordinate geometry, and measurements. Use clear explanations "
+                    "and plain math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi). "
+                    "Avoid answering questions unrelated to geometry."
                 ),
             },
             {"role": "user", "content": user_message},
@@ -117,7 +135,7 @@ async def log_requests(request: Request, call_next):
 @app.get("/")
 async def root():
     logging.info("Root endpoint accessed")
-    return {"message": "Welcome to the Math and Arithmetic Tutor API!"}
+    return {"message": "Welcome to the Geometry Tutor API for Grades 7–10!"}
 
 # Chatbot interaction endpoint
 @app.post("/chat")
@@ -132,11 +150,11 @@ async def chat_with_bot(message: Message):
 
         # Check if the question is math-related
         if not is_math_related(user_message):
-            non_math_response = "I can only assist with math-related questions. Please ask about mathematics or arithmetic."
-            logging.info(f"Non-math question detected. Response: {non_math_response}")
+            non_math_response = "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question."
+            logging.info(f"Non-geometry question detected. Response: {non_math_response}")
             return {"response": non_math_response}
 
-        # Process math-related questions using GPT
+        # Process geometry-related questions using GPT
         response = get_gpt_response(user_message)
         logging.info(f"Response: {response}")
         return {"response": response}
