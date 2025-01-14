@@ -1,8 +1,6 @@
 import openai
 import os
 import re
-import matplotlib.pyplot as plt
-import io
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.responses import FileResponse, PlainTextResponse, Response
@@ -67,50 +65,7 @@ def is_math_related(user_message: str) -> bool:
 
     # Check if any math-related keyword or symbol exists in the message
     return any(keyword in user_message for keyword in math_related_keywords)
-
-# Function to draw geometry figures
-def draw_geometry_figure(user_message: str) -> io.BytesIO:
-    """
-    Draw geometry figures based on the user's message.
-    Supports visualization for circle, triangle, rectangle, square, and polygon.
-    """
-    fig, ax = plt.subplots()
-
-    if "circle" in user_message:
-        circle = plt.Circle((0.5, 0.5), 0.4, color="blue", fill=False)
-        ax.add_artist(circle)
-        ax.set_title("Circle Visualization")
-    elif "triangle" in user_message:
-        triangle = plt.Polygon([[0.1, 0.1], [0.9, 0.1], [0.5, 0.8]], closed=True, color="green", fill=False)
-        ax.add_artist(triangle)
-        ax.set_title("Triangle Visualization")
-    elif "rectangle" in user_message:
-        rectangle = plt.Rectangle((0.1, 0.1), 0.8, 0.4, color="red", fill=False)
-        ax.add_artist(rectangle)
-        ax.set_title("Rectangle Visualization")
-    elif "square" in user_message:
-        square = plt.Rectangle((0.3, 0.3), 0.4, 0.4, color="purple", fill=False)
-        ax.add_artist(square)
-        ax.set_title("Square Visualization")
-    elif "polygon" in user_message:
-        polygon = plt.Polygon([[0.2, 0.1], [0.8, 0.2], [0.6, 0.8], [0.4, 0.8], [0.1, 0.3]], closed=True, color="orange", fill=False)
-        ax.add_artist(polygon)
-        ax.set_title("Polygon Visualization")
-    else:
-        ax.text(0.5, 0.5, "No specific shape to visualize!", ha="center", va="center", fontsize=12)
-        ax.set_title("No Shape Found")
     
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.set_aspect('equal')
-    plt.axis('off')
-
-    # Save figure to a BytesIO object
-    img_bytes = io.BytesIO()
-    plt.savefig(img_bytes, format="png")
-    plt.close(fig)
-    img_bytes.seek(0)
-    return img_bytes
 
 # Post-processing function to clean LaTeX-style output
 def convert_to_plain_math(response: str) -> str:
