@@ -224,6 +224,15 @@ async def chat_with_bot(message: Message):
             logging.info(f"Non-geometry question detected. Response: {non_math_response}")
             return {"response": non_math_response}
 
+        # NEW: Check if "illustrate" is explicitly mentioned in the user message
+        if "illustrate" in user_message.lower():
+            # Call the visualization function
+            filepath = create_visualization(user_message)
+            if filepath:
+                return FileResponse(filepath, media_type="image/png")
+            # If no visualization could be created, send an appropriate response
+            return {"response": "Sorry, I couldn't create an illustration for that request."}
+
         # Process geometry-related questions using GPT
         response = get_gpt_response(user_message)
         logging.info(f"Response: {response}")
