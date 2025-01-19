@@ -8,6 +8,8 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import matplotlib.pyplot as plt
 import numpy as np
+from illustration import create_visualization  # Import from the new file
+
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -92,73 +94,6 @@ def convert_to_plain_math(response: str) -> str:
     response = response.replace("\\", "")
     return response.strip()
 
-# Function to create geometric visualizations
-def create_visualization(user_message: str) -> str:
-    try:
-        if "circle" in user_message:
-            radius = 5
-            fig, ax = plt.subplots()
-            circle = plt.Circle((0, 0), radius, fill=False, color="blue", linewidth=2)
-            ax.add_artist(circle)
-            ax.set_xlim(-radius - 1, radius + 1)
-            ax.set_ylim(-radius - 1, radius + 1)
-            ax.set_aspect('equal', 'box')
-            ax.set_title("Circle with radius 5 units")
-            plt.grid(True)
-            filepath = "circle_plot.png"
-            plt.savefig(filepath)
-            plt.close(fig)
-            return filepath
-
-        elif "triangle" in user_message:
-            points = np.array([[0, 0], [4, 0], [2, 3]])
-            fig, ax = plt.subplots()
-            triangle = plt.Polygon(points, fill=None, edgecolor="green", linewidth=2)
-            ax.add_patch(triangle)
-            ax.plot(points[:, 0], points[:, 1], 'o', color="red")
-            ax.set_xlim(-1, 5)
-            ax.set_ylim(-1, 4)
-            ax.set_aspect('equal', 'box')
-            ax.set_title("Triangle")
-            plt.grid(True)
-            filepath = "triangle_plot.png"
-            plt.savefig(filepath)
-            plt.close(fig)
-            return filepath
-
-        elif "rectangle" in user_message:
-            width, height = 6, 3
-            fig, ax = plt.subplots()
-            rectangle = plt.Rectangle((0, 0), width, height, fill=None, edgecolor="purple", linewidth=2)
-            ax.add_patch(rectangle)
-            ax.set_xlim(-1, width + 1)
-            ax.set_ylim(-1, height + 1)
-            ax.set_aspect('equal', 'box')
-            ax.set_title("Rectangle")
-            plt.grid(True)
-            filepath = "rectangle_plot.png"
-            plt.savefig(filepath)
-            plt.close(fig)
-            return filepath
-
-        elif "coordinate plane" in user_message:
-            fig, ax = plt.subplots()
-            ax.axhline(0, color="black", linewidth=0.8)
-            ax.axvline(0, color="black", linewidth=0.8)
-            ax.set_xlim(-10, 10)
-            ax.set_ylim(-10, 10)
-            ax.grid(True, which="both", linestyle="--", linewidth=0.5)
-            ax.set_title("Coordinate Plane")
-            plt.savefig("coordinate_plane.png")
-            plt.close(fig)
-            return "coordinate_plane.png"
-
-        return ""  # No matching visualization found
-    except Exception as e:
-        logging.error(f"Error creating visualization: {e}")
-        return ""
-
-
 # Function to interact with OpenAI's GPT
 def get_gpt_response(user_message: str) -> str:
     try:
@@ -225,12 +160,41 @@ async def chat_with_bot(message: Message):
             return {"response": non_math_response}
 
         # NEW: Check if "illustrate" is explicitly mentioned in the user message
+       # Extract numeric parameters
+        parameters = extract_numeric_parameters(user_message)
+
+        # Check if "illustrate" is explicitly mentioned
         if "illustrate" in user_message.lower():
-            # Call the visualization function
-            filepath = create_visualization(user_message)
-            if filepath:
+            if "circle" in user_message:
+                radius = parameters.get("radius")
+                diameter = parameters.get("diameter")
+                if diameter:
+                    radius = diameter / 2
+                radius = radius or 5
+                filepath = draw_circle(radius)
                 return FileResponse(filepath, media_type="image/png")
-            # If no visualization could be created, send an appropriate response
+
+            if "triangle" in user_message:
+                base = parameters.get("base", 4)
+                height = parameters.get("height", 3)
+                filepath = draw_triangle(base, height)
+                return FileResponse(filepath, media_type="image/png")
+
+            if "rectangle" in user_message:
+                width = parameters.get("width", 6)
+                height = parameters.get("height", 3)
+                filepath = draw_rectangle(width, height)
+                return FileResponse(filepath, media_type="image/png")
+
+            if "sin" in user_message or "cos" in user_message or "tan" in user_message:
+                if "sin" in user_message:
+                    filepath = plot_trigonometric_function("sin")
+                elif "cos" in user_message:
+                    filepath = plot_trigonometric_function("cos")
+                elif "tan" in user_message:
+                    filepath = plot_trigonometric_function("tan")
+                return FileResponse(filepath, media_type="image/png")
+
             return {"response": "Sorry, I couldn't create an illustration for that request."}
 
         # Process geometry-related questions using GPT
