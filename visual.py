@@ -73,6 +73,7 @@ def is_math_related(user_message: str) -> bool:
 def extract_numeric_parameters(user_message: str) -> dict:
     """
     Extract all numeric parameters from the user message.
+    Supports phrases like 'base is 5, height is 4', or 'x1 is 0, y1 is 0, x2 is 5, y2 is 0, x3 is 3, y3 is 4'.
     """
     param_regex = r"(?P<key>\w+)\s*(is|of)\s*(?P<value>\d+(\.\d+)?)"
     matches = re.findall(param_regex, user_message.lower())
@@ -195,10 +196,26 @@ async def chat_with_bot(message: Message):
                 return FileResponse(filepath, media_type="image/png")
     
             if "triangle" in user_message:
-                base = parameters.get("base", 5)
-                height = parameters.get("height", 5)
-                filepath = draw_triangle(base, height)
+                # If the user specifies a right triangle
+                if "right triangle" in user_message:
+                    leg_a = parameters.get("leg_a", 3)  # Default leg_a = 3
+                    leg_b = parameters.get("leg_b", 4)  # Default leg_b = 4
+
+                    # Vertices for a right triangle: (0, 0), (leg_a, 0), (0, leg_b)
+                    filepath = draw_triangle(0, 0, leg_a, 0, 0, leg_b)
+                    return FileResponse(filepath, media_type="image/png")
+
+                # Generic triangle: Extract or use default coordinates
+                x1 = parameters.get("x1", 0)
+                y1 = parameters.get("y1", 0)
+                x2 = parameters.get("x2", 5)
+                y2 = parameters.get("y2", 0)
+                x3 = parameters.get("x3", 2.5)
+                y3 = parameters.get("y3", 4)
+
+                filepath = draw_triangle(x1, y1, x2, y2, x3, y3)
                 return FileResponse(filepath, media_type="image/png")
+
 
             if "rectangle" in user_message:
                 width = parameters.get("width", 5)

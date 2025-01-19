@@ -19,19 +19,23 @@ def draw_circle(radius: float) -> str:
     plt.close(fig)
     return filepath
 
-def draw_triangle(base: float, height: float) -> str:
+def draw_triangle(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float) -> str:
     """
-    Draw a triangle based on the provided base and height.
+    Draw a triangle based on three vertices (x1, y1), (x2, y2), (x3, y3).
     """
     fig, ax = plt.subplots()
-    points = np.array([[0, 0], [base, 0], [base / 2, height]])
+    # Define triangle vertices
+    points = np.array([[x1, y1], [x2, y2], [x3, y3]])
     triangle = plt.Polygon(points, fill=None, edgecolor="purple", linewidth=2)
     ax.add_patch(triangle)
-    ax.set_xlim(-1, base + 1)
-    ax.set_ylim(-1, height + 1)
+
+    # Adjust axis limits to fit the triangle
+    ax.set_xlim(min(x1, x2, x3) - 1, max(x1, x2, x3) + 1)
+    ax.set_ylim(min(y1, y2, y3) - 1, max(y1, y2, y3) + 1)
     ax.set_aspect('equal', 'box')
-    ax.set_title(f"Triangle (Base={base}, Height={height})")
+    ax.set_title("Triangle")
     plt.grid(True)
+
     filepath = "triangle_plot.png"
     plt.savefig(filepath)
     plt.close(fig)
