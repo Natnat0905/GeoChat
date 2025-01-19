@@ -9,7 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import matplotlib.pyplot as plt
 import numpy as np
 from illustration import create_visualization  # Import from the new file
-
+from illustration import draw_circle, draw_triangle, draw_rectangle, plot_trigonometric_function  # Import required functions
+from illustration import extract_numeric_parameters
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -70,6 +71,15 @@ def is_math_related(user_message: str) -> bool:
     # Check if any math-related keyword or symbol exists in the message
     return any(keyword in user_message for keyword in math_related_keywords)
     
+
+def extract_numeric_parameters(user_message: str) -> dict:
+    """
+    Extract all numeric parameters from the user message.
+    Supports phrases like 'radius is 10', 'base is 5, height is 8', or 'diameter of 15'.
+    """
+    parameter_regex = r"(?P<key>\w+)\s*(is|of)\s*(?P<value>\d+(\.\d+)?)"
+    matches = re.findall(parameter_regex, user_message.lower())
+    return {match[0]: float(match[2]) for match in matches}
 
 # Post-processing function to clean LaTeX-style output
 def convert_to_plain_math(response: str) -> str:
@@ -159,7 +169,7 @@ async def chat_with_bot(message: Message):
             logging.info(f"Non-geometry question detected. Response: {non_math_response}")
             return {"response": non_math_response}
 
-        # NEW: Check if "illustrate" is explicitly mentioned in the user message
+    # NEW: Check if "illustrate" is explicitly mentioned in the user message
        # Extract numeric parameters
         parameters = extract_numeric_parameters(user_message)
 
