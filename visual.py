@@ -169,10 +169,11 @@ async def root():
 
 # Chatbot interaction endpoint
 @app.post("/chat")
+@app.post("/chat")
 async def chat_with_bot(message: Message):
     """
     Chat endpoint to process user requests and create visualizations.
-    Combines manual parameter extraction and GPT-based visualization handling.
+    Handles both structured GPT responses for visualization and plain-text explanations.
     """
     try:
         user_message = message.user_message
@@ -216,7 +217,6 @@ async def chat_with_bot(message: Message):
                 filepath = draw_triangle(x1, y1, x2, y2, x3, y3)
                 return FileResponse(filepath, media_type="image/png")
 
-
             if "rectangle" in user_message:
                 width = parameters.get("width", 5)
                 height = parameters.get("height", 3)
@@ -238,35 +238,42 @@ async def chat_with_bot(message: Message):
         gpt_response = get_gpt_response(user_message)
         logging.info(f"GPT Response: {gpt_response}")
 
-        # Parse the GPT response for visualization parameters
-        if "shape" in gpt_response:
+        # Step 4: Handle structured GPT response
+        if isinstance(gpt_response, dict) and "shape" in gpt_response:
             shape = gpt_response["shape"]
             params = gpt_response["parameters"]
 
-        # Handle GPT-generated visualizations
-        if shape == "circle":
-            radius = params.get("radius", 5)  # Default radius is 5
-            filepath = draw_circle(radius)
-            return FileResponse(filepath, media_type="image/png")
+            # Handle GPT-generated visualizations
+            if shape == "circle":
+                radius = params.get("radius", 5)  # Default radius is 5
+                filepath = draw_circle(radius)
+                return FileResponse(filepath, media_type="image/png")
 
-        if shape == "triangle":
-            base = params.get("base", 5)
-            height = params.get("height", 5)
-            filepath = draw_triangle(base, height)
-            return FileResponse(filepath, media_type="image/png")
+            if shape == "triangle":
+                base = params.get("base", 5)
+                height = params.get("height", 5)
+                filepath = draw_triangle(base, height)
+                return FileResponse(filepath, media_type="image/png")
 
-        elif shape == "rectangle":
-            width = params.get("width", 5)
-            height = params.get("height", 3)
-            filepath = draw_rectangle(width, height)
-            return FileResponse(filepath, media_type="image/png")
+            elif shape == "rectangle":
+                width = params.get("width", 5)
+                height = params.get("height", 3)
+                filepath = draw_rectangle(width, height)
+                return FileResponse(filepath, media_type="image/png")
 
-        elif shape == "trigonometric":
-            function = params.get("function", "sin")  # Default to sin
-            filepath = plot_trigonometric_function(function)
-            return FileResponse(filepath, media_type="image/png")
+            elif shape == "trigonometric":
+                function = params.get("function", "sin")  # Default to sin
+                filepath = plot_trigonometric_function(function)
+                return FileResponse(filepath, media_type="image/png")
 
-        return {"response": "Sorry, I couldn't create an illustration for that request."}
+            return {"response": "Sorry, I couldn't create an illustration for that request."}
+
+        # Step 5: Handle plain-text GPT response
+        if isinstance(gpt_response, dict) and "response" in gpt_response:
+            return {"response": gpt_response["response"]}
+
+        # Default fallback
+        return {"response": "Sorry, I couldn't understand your request."}
 
     except Exception as e:
         logging.error(f"Error processing message: {e}")
