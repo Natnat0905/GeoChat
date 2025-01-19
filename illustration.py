@@ -8,33 +8,49 @@ def create_visualization(user_message: str) -> str:
     Dynamically create illustrations for 2D geometry shapes or mathematical functions.
     """
     try:
+        parameters = extract_numeric_parameters(user_message)
+
+        # Check for specific shapes or functions in the message
         if "circle" in user_message:
-            radius = extract_numeric_parameter(user_message, "radius", default=5)
+            radius = parameters.get("radius") or (parameters.get("diameter", 0) / 2) or 5
             return draw_circle(radius)
 
         if "triangle" in user_message:
-            base = extract_numeric_parameter(user_message, "base", default=4)
-            height = extract_numeric_parameter(user_message, "height", default=3)
+            base = parameters.get("base", 4)
+            height = parameters.get("height", 3)
             return draw_triangle(base, height)
 
         if "rectangle" in user_message:
-            width = extract_numeric_parameter(user_message, "width", default=6)
-            height = extract_numeric_parameter(user_message, "height", default=3)
+            width = parameters.get("width", 6)
+            height = parameters.get("height", 3)
             return draw_rectangle(width, height)
+
+        if "ellipse" in user_message:
+            major_axis = parameters.get("major_axis", 6)
+            minor_axis = parameters.get("minor_axis", 4)
+            return draw_ellipse(major_axis, minor_axis)
+
+        if "polygon" in user_message:
+            sides = parameters.get("sides", 5)
+            radius = parameters.get("radius", 3)
+            return draw_polygon(sides, radius)
 
         if "sin" in user_message or "cos" in user_message or "tan" in user_message:
             return plot_trigonometric_function(user_message)
 
-        return ""
+        return ""  # Return an empty string if no matching shape or function is found
     except Exception as e:
         logging.error(f"Error creating visualization: {e}")
         return ""
 
-def extract_numeric_parameter(user_message: str, param: str, default: float = 0) -> float:
-    match = re.search(rf"{param}\s*is\s*(\d+)", user_message.lower())
-    if match:
-        return float(match.group(1))
-    return default
+def extract_numeric_parameters(user_message: str) -> dict:
+    """
+    Extract all numeric parameters from the user message.
+    Supports phrases like 'radius is 10', 'base is 5, height is 8', or 'diameter of 15'.
+    """
+    parameter_regex = r"(?P<key>\w+)\s*(is|of)\s*(?P<value>\d+(\.\d+)?)"
+    matches = re.findall(parameter_regex, user_message.lower())
+    return {match[0]: float(match[2]) for match in matches}
 
 def draw_circle(radius: float) -> str:
     fig, ax = plt.subplots()
@@ -75,6 +91,38 @@ def draw_rectangle(width: float, height: float) -> str:
     ax.set_title(f"Rectangle ({width}x{height})")
     plt.grid(True)
     filepath = "rectangle_plot.png"
+    plt.savefig(filepath)
+    plt.close(fig)
+    return filepath
+
+def draw_ellipse(major_axis: float, minor_axis: float) -> str:
+    fig, ax = plt.subplots()
+    ellipse = plt.Ellipse((0, 0), 2 * major_axis, 2 * minor_axis, fill=False, color="red", linewidth=2)
+    ax.add_artist(ellipse)
+    ax.set_xlim(-major_axis - 1, major_axis + 1)
+    ax.set_ylim(-minor_axis - 1, minor_axis + 1)
+    ax.set_aspect('equal', 'box')
+    ax.set_title(f"Ellipse (Major Axis={major_axis}, Minor Axis={minor_axis})")
+    plt.grid(True)
+    filepath = "ellipse_plot.png"
+    plt.savefig(filepath)
+    plt.close(fig)
+    return filepath
+
+def draw_polygon(sides: int, radius: float) -> str:
+    if sides < 3:
+        raise ValueError("A polygon must have at least 3 sides.")
+    angles = np.linspace(0, 2 * np.pi, sides, endpoint=False)
+    x = radius * np.cos(angles)
+    y = radius * np.sin(angles)
+    fig, ax = plt.subplots()
+    ax.plot(np.append(x, x[0]), np.append(y, y[0]), color="orange", linewidth=2)
+    ax.set_xlim(-radius - 1, radius + 1)
+    ax.set_ylim(-radius - 1, radius + 1)
+    ax.set_aspect('equal', 'box')
+    ax.set_title(f"Polygon (Sides={sides}, Radius={radius})")
+    plt.grid(True)
+    filepath = "polygon_plot.png"
     plt.savefig(filepath)
     plt.close(fig)
     return filepath
