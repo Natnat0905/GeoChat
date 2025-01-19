@@ -19,24 +19,60 @@ def draw_circle(radius: float) -> str:
     plt.close(fig)
     return filepath
 
-def draw_triangle(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float) -> str:
+def draw_right_triangle(leg_a: float, leg_b: float) -> str:
     """
-    Draw a triangle based on three vertices (x1, y1), (x2, y2), (x3, y3).
+    Draw a right triangle with two legs: leg_a (x-axis) and leg_b (y-axis).
     """
     fig, ax = plt.subplots()
-    # Define triangle vertices
+    points = np.array([[0, 0], [leg_a, 0], [0, leg_b]])
+    triangle = plt.Polygon(points, fill=None, edgecolor="purple", linewidth=2)
+    ax.add_patch(triangle)
+
+    ax.set_xlim(-1, leg_a + 1)
+    ax.set_ylim(-1, leg_b + 1)
+    ax.set_aspect("equal", "box")
+    ax.set_title(f"Right Triangle (Leg A={leg_a}, Leg B={leg_b})")
+    plt.grid(True)
+
+    filepath = "right_triangle_plot.png"
+    plt.savefig(filepath)
+    plt.close(fig)
+    return filepath
+
+
+def draw_generic_triangle(side_a: float, side_b: float, side_c: float) -> str:
+    """
+    Draw a generic triangle based on three side lengths (side_a, side_b, side_c).
+    Validates the Triangle Inequality Theorem before plotting.
+    """
+    # Validate Triangle Inequality Theorem
+    if (
+        side_a + side_b <= side_c
+        or side_a + side_c <= side_b
+        or side_b + side_c <= side_a
+    ):
+        raise ValueError(
+            "Invalid side lengths: Triangle Inequality Theorem violated. Cannot plot the triangle."
+        )
+
+    # Calculate approximate triangle vertices
+    x1, y1 = 0, 0
+    x2, y2 = side_a, 0
+    x3 = (side_a**2 + side_b**2 - side_c**2) / (2 * side_a)
+    y3 = np.sqrt(side_b**2 - x3**2)
+
+    fig, ax = plt.subplots()
     points = np.array([[x1, y1], [x2, y2], [x3, y3]])
     triangle = plt.Polygon(points, fill=None, edgecolor="purple", linewidth=2)
     ax.add_patch(triangle)
 
-    # Adjust axis limits to fit the triangle
-    ax.set_xlim(min(x1, x2, x3) - 1, max(x1, x2, x3) + 1)
-    ax.set_ylim(min(y1, y2, y3) - 1, max(y1, y2, y3) + 1)
-    ax.set_aspect('equal', 'box')
+    ax.set_xlim(-1, max(x2, x3) + 1)
+    ax.set_ylim(-1, y3 + 1)
+    ax.set_aspect("equal", "box")
     ax.set_title("Triangle")
     plt.grid(True)
 
-    filepath = "triangle_plot.png"
+    filepath = "generic_triangle_plot.png"
     plt.savefig(filepath)
     plt.close(fig)
     return filepath

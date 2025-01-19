@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import matplotlib.pyplot as plt
 import numpy as np
-from illustration import draw_circle, draw_triangle, draw_rectangle, plot_trigonometric_function  # Import required functions
+from illustration import draw_circle, draw_right_triangle, draw_rectangle, plot_trigonometric_function, draw_generic_triangle  # Import required functions
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -194,28 +194,26 @@ async def chat_with_bot(message: Message):
                 radius = parameters.get("radius", parameters.get("diameter", 10) / 2)
                 filepath = draw_circle(radius)
                 return FileResponse(filepath, media_type="image/png")
-    
-            if "triangle" in user_message:
-                # If the user specifies a right triangle
-                if "right triangle" in user_message:
-                    leg_a = parameters.get("leg_a", 3)  # Default leg_a = 3
-                    leg_b = parameters.get("leg_b", 4)  # Default leg_b = 4
-
-                    # Vertices for a right triangle: (0, 0), (leg_a, 0), (0, leg_b)
-                    filepath = draw_triangle(0, 0, leg_a, 0, 0, leg_b)
-                    return FileResponse(filepath, media_type="image/png")
-
-                # Generic triangle: Extract or use default coordinates
-                x1 = parameters.get("x1", 0)
-                y1 = parameters.get("y1", 0)
-                x2 = parameters.get("x2", 5)
-                y2 = parameters.get("y2", 0)
-                x3 = parameters.get("x3", 2.5)
-                y3 = parameters.get("y3", 4)
-
-                filepath = draw_triangle(x1, y1, x2, y2, x3, y3)
+            
+             # Handle right triangle visualization
+            if "right triangle" in user_message:
+                leg_a = parameters.get("leg_a", 3)  # Default leg_a = 3
+                leg_b = parameters.get("leg_b", 4)  # Default leg_b = 4
+                filepath = draw_right_triangle(leg_a, leg_b)
                 return FileResponse(filepath, media_type="image/png")
-
+    
+             # Handle generic triangle visualization
+            if "triangle" in user_message:
+                side_a = parameters.get("side_a", 5)
+                side_b = parameters.get("side_b", 10)
+                side_c = parameters.get("side_c", 7)
+                try:
+                    filepath = draw_generic_triangle(side_a, side_b, side_c)
+                    return FileResponse(filepath, media_type="image/png")
+                except ValueError as e:
+                    logging.error(str(e))
+                    return {"response": str(e)}
+                
             if "rectangle" in user_message:
                 width = parameters.get("width", 5)
                 height = parameters.get("height", 3)
@@ -249,9 +247,21 @@ async def chat_with_bot(message: Message):
                 return FileResponse(filepath, media_type="image/png")
 
             if shape == "triangle":
-                base = params.get("base", 5)
-                height = params.get("height", 5)
-                filepath = draw_triangle(base, height)
+                if "right_triangle" in params:
+                    # For right triangle
+                    leg_a = params.get("leg_a", 3)
+                    leg_b = params.get("leg_b", 4)
+                    filepath = draw_right_triangle(leg_a, leg_b)
+                else:
+                    # For generic triangle
+                    side_a = params.get("side_a", 5)
+                    side_b = params.get("side_b", 10)
+                    side_c = params.get("side_c", 7)
+                    try:
+                        filepath = draw_generic_triangle(side_a, side_b, side_c)
+                    except ValueError as e:
+                        logging.error(str(e))
+                        return {"response": str(e)}
                 return FileResponse(filepath, media_type="image/png")
 
             elif shape == "rectangle":
