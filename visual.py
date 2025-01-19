@@ -8,9 +8,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import matplotlib.pyplot as plt
 import numpy as np
-from illustration import create_visualization  # Import from the new file
 from illustration import draw_circle, draw_triangle, draw_rectangle, plot_trigonometric_function  # Import required functions
-from illustration import extract_numeric_parameters
 
 # Initialize the FastAPI app
 app = FastAPI()
