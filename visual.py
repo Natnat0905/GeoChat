@@ -267,11 +267,10 @@ async def chat_with_bot(message: Message):
 
             return {"response": "Sorry, I couldn't create an illustration for that request."}
 
-       # Step 5: Handle plain-text GPT response
+        # Step 5: Handle plain-text GPT response
         if isinstance(gpt_response, dict) and "response" in gpt_response:
             # Extract the "response" value and send it as plain text
-            return {"response": gpt_response["response"]}
-
+            return PlainTextResponse(content=gpt_response["response"])  # Use PlainTextResponse here
 
         # Default fallback
         return {"response": "Sorry, I couldn't understand your request."}
