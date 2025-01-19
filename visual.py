@@ -73,10 +73,9 @@ def is_math_related(user_message: str) -> bool:
 def extract_numeric_parameters(user_message: str) -> dict:
     """
     Extract all numeric parameters from the user message.
-    Supports phrases like 'radius is 10', 'base is 5, height is 8', or 'diameter of 15'.
     """
-    parameter_regex = r"(?P<key>\w+)\s*(is|of)\s*(?P<value>\d+(\.\d+)?)"
-    matches = re.findall(parameter_regex, user_message.lower())
+    param_regex = r"(?P<key>\w+)\s*(is|of)\s*(?P<value>\d+(\.\d+)?)"
+    matches = re.findall(param_regex, user_message.lower())
     return {match[0]: float(match[2]) for match in matches}
 
 # Post-processing function to clean LaTeX-style output
@@ -191,22 +190,18 @@ async def chat_with_bot(message: Message):
 
             # Handle manual visualization requests
             if "circle" in user_message:
-                radius = parameters.get("radius")
-                diameter = parameters.get("diameter")
-                if diameter:
-                    radius = diameter / 2
-                radius = radius or 5  # Default to radius = 5
+                radius = parameters.get("radius", parameters.get("diameter", 10) / 2)
                 filepath = draw_circle(radius)
                 return FileResponse(filepath, media_type="image/png")
-
+    
             if "triangle" in user_message:
-                base = parameters.get("base", 4)
-                height = parameters.get("height", 3)
+                base = parameters.get("base", 5)
+                height = parameters.get("height", 5)
                 filepath = draw_triangle(base, height)
                 return FileResponse(filepath, media_type="image/png")
 
             if "rectangle" in user_message:
-                width = parameters.get("width", 6)
+                width = parameters.get("width", 5)
                 height = parameters.get("height", 3)
                 filepath = draw_rectangle(width, height)
                 return FileResponse(filepath, media_type="image/png")
@@ -227,8 +222,9 @@ async def chat_with_bot(message: Message):
         logging.info(f"GPT Response: {gpt_response}")
 
         # Parse the GPT response for visualization parameters
-        shape = gpt_response.get("shape")
-        params = gpt_response.get("parameters")
+        if "shape" in gpt_response:
+            shape = gpt_response["shape"]
+            params = gpt_response["parameters"]
 
         # Handle GPT-generated visualizations
         if shape == "circle":
@@ -236,14 +232,14 @@ async def chat_with_bot(message: Message):
             filepath = draw_circle(radius)
             return FileResponse(filepath, media_type="image/png")
 
-        elif shape == "triangle":
-            base = params.get("base", 4)
-            height = params.get("height", 3)
+        if shape == "triangle":
+            base = params.get("base", 5)
+            height = params.get("height", 5)
             filepath = draw_triangle(base, height)
             return FileResponse(filepath, media_type="image/png")
 
         elif shape == "rectangle":
-            width = params.get("width", 6)
+            width = params.get("width", 5)
             height = params.get("height", 3)
             filepath = draw_rectangle(width, height)
             return FileResponse(filepath, media_type="image/png")
