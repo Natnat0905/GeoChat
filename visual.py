@@ -105,17 +105,22 @@ def convert_to_plain_math(response: str) -> str:
     return response.strip()
 
 # Function to interact with OpenAI's GPT
-def get_gpt_response(user_message: str) -> str:
+def get_gpt_response(user_message: str) -> dict:
+    """
+    Use GPT to process the user's message and optionally return parameters for visualization.
+    Handles both plain-text explanations and structured parameters for illustrations.
+    """
     try:
-        # Structured messages for the GPT chat model
+        # GPT system prompt tailored to handle both explanations and visualization parameters
         messages = [
             {
                 "role": "system",
                 "content": (
-                    "You are a geometry tutor for grades 7 to 10. Focus on explaining geometry concepts "
-                    "such as angles, shapes, theorems, coordinate geometry, and measurements. Use clear explanations "
-                    "and plain math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi). "
-                    "Avoid answering questions unrelated to geometry."
+                    "You are a geometry assistant for grades 7 to 10. Your tasks are:"
+                    "\n1. Explain geometry concepts clearly using plain math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi)."
+                    "\n2. Provide parameters for 2D shape visualizations (e.g., a circle with radius 15)."
+                    "\n3. When required, return the shape name and parameters as a Python dictionary."
+                    "\nEnsure your response matches the user's intent: explanation or visualization."
                 ),
             },
             {"role": "user", "content": user_message},
@@ -129,14 +134,26 @@ def get_gpt_response(user_message: str) -> str:
             temperature=0.7,
         )
 
-        # Extract GPT response and process it
-        raw_response = response["choices"][0]["message"]["content"].strip()
-        processed_response = convert_to_plain_math(raw_response)  # Post-process the response
-        return processed_response
+        # Extract GPT response
+        gpt_output = response["choices"][0]["message"]["content"].strip()
+        logging.info(f"GPT Output: {gpt_output}")
+
+        # Attempt to parse the response as a dictionary for visualization
+        try:
+            parsed_response = eval(gpt_output)  # Ensure GPT outputs a valid Python dictionary
+            if isinstance(parsed_response, dict) and "shape" in parsed_response and "parameters" in parsed_response:
+                # If valid parameters for visualization are detected
+                return parsed_response
+        except Exception:
+            pass  # If parsing fails, treat the output as plain text
+
+        # If not a visualization request, return plain-text explanation
+        return {"response": convert_to_plain_math(gpt_output)}
+
     except Exception as e:
-        # Log detailed error information
-        logging.error(f"Error communicating with OpenAI: {str(e)}")
-        return f"Sorry, I encountered an error: {str(e)}"
+        logging.error(f"Error communicating with GPT: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error communicating with GPT")
+
 
 # Middleware to log all incoming requests
 @app.middleware("http")
@@ -156,31 +173,31 @@ async def root():
 @app.post("/chat")
 async def chat_with_bot(message: Message):
     """
-    Endpoint to interact with the chatbot.
-    Only processes math-related questions.
+    Chat endpoint to process user requests and create visualizations.
+    Combines manual parameter extraction and GPT-based visualization handling.
     """
     try:
         user_message = message.user_message
         logging.info(f"Received message: {user_message}")
 
-        # Check if the question is math-related
+        # Step 1: Check if the question is math-related
         if not is_math_related(user_message):
             non_math_response = "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question."
             logging.info(f"Non-geometry question detected. Response: {non_math_response}")
             return {"response": non_math_response}
 
-    # NEW: Check if "illustrate" is explicitly mentioned in the user message
-       # Extract numeric parameters
-        parameters = extract_numeric_parameters(user_message)
-
-        # Check if "illustrate" is explicitly mentioned
+        # Step 2: Check if "illustrate" is explicitly mentioned
         if "illustrate" in user_message.lower():
+            # Extract numeric parameters manually
+            parameters = extract_numeric_parameters(user_message)
+
+            # Handle manual visualization requests
             if "circle" in user_message:
                 radius = parameters.get("radius")
                 diameter = parameters.get("diameter")
                 if diameter:
                     radius = diameter / 2
-                radius = radius or 5
+                radius = radius or 5  # Default to radius = 5
                 filepath = draw_circle(radius)
                 return FileResponse(filepath, media_type="image/png")
 
@@ -207,10 +224,39 @@ async def chat_with_bot(message: Message):
 
             return {"response": "Sorry, I couldn't create an illustration for that request."}
 
-        # Process geometry-related questions using GPT
-        response = get_gpt_response(user_message)
-        logging.info(f"Response: {response}")
-        return {"response": response}
+        # Step 3: Use GPT to process the message if "illustrate" is not mentioned
+        gpt_response = get_gpt_response(user_message)
+        logging.info(f"GPT Response: {gpt_response}")
+
+        # Parse the GPT response for visualization parameters
+        shape = gpt_response.get("shape")
+        params = gpt_response.get("parameters")
+
+        # Handle GPT-generated visualizations
+        if shape == "circle":
+            radius = params.get("radius", 5)  # Default radius is 5
+            filepath = draw_circle(radius)
+            return FileResponse(filepath, media_type="image/png")
+
+        elif shape == "triangle":
+            base = params.get("base", 4)
+            height = params.get("height", 3)
+            filepath = draw_triangle(base, height)
+            return FileResponse(filepath, media_type="image/png")
+
+        elif shape == "rectangle":
+            width = params.get("width", 6)
+            height = params.get("height", 3)
+            filepath = draw_rectangle(width, height)
+            return FileResponse(filepath, media_type="image/png")
+
+        elif shape == "trigonometric":
+            function = params.get("function", "sin")  # Default to sin
+            filepath = plot_trigonometric_function(function)
+            return FileResponse(filepath, media_type="image/png")
+
+        return {"response": "Sorry, I couldn't create an illustration for that request."}
+
     except Exception as e:
         logging.error(f"Error processing message: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
