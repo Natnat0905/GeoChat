@@ -116,9 +116,10 @@ def get_gpt_response(user_message: str) -> dict:
                 "content": (
                     "You are a geometry assistant for grades 7 to 10. Your tasks are:"
                     "\n1. Explain geometry concepts clearly using plain math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi)."
-                    "\n2. Provide parameters for 2D shape visualizations (e.g., a circle with radius 15)."
-                    "\n3. When required, return the shape name and parameters as a Python dictionary."
-                    "\nEnsure your response matches the user's intent: explanation or visualization."
+                    "\n2. For visualization requests (e.g., 'Draw a right triangle with legs 6 and 7'), respond with a Python dictionary containing:"
+                    "\n    - 'shape': the type of shape (e.g., 'triangle', 'circle', 'rectangle')."
+                    "\n    - 'parameters': a dictionary of parameters (e.g., {'leg_a': 6, 'leg_b': 7})."
+                    "\n3. Ensure structured responses for visualization requests. For plain explanations, return text only."
                 ),
             },
             {"role": "user", "content": user_message},
@@ -246,31 +247,14 @@ async def chat_with_bot(message: Message):
                 filepath = draw_circle(radius)
                 return FileResponse(filepath, media_type="image/png")
 
-            if shape == "triangle":
-                if "right_triangle" in params:
-                    # For right triangle
-                    leg_a = params.get("leg_a")
-                    leg_b = params.get("leg_b")
-                    
-                    if leg_a is None or leg_b is None:
-                        legs = [v for k, v in parameters.items() if "leg" in k]
-                        if len(legs) >= 2:
-                            leg_a, leg_b = legs[:2]
+            if shape == "triangle" and params.get("type") == "right":
+                leg_a = params.get("leg_a")
+                leg_b = params.get("leg_b")
 
-                    if leg_a is None or leg_b is None:
-                        return {"response": "Please provide both leg_a and leg_b to illustrate a right triangle."}
-                    
-                    filepath = draw_right_triangle(leg_a, leg_b)
-                else:
-                    # For generic triangle
-                    side_a = params.get("side_a", 5)
-                    side_b = params.get("side_b", 10)
-                    side_c = params.get("side_c", 7)
-                    try:
-                        filepath = draw_generic_triangle(side_a, side_b, side_c)
-                    except ValueError as e:
-                        logging.error(str(e))
-                        return {"response": str(e)}
+                if leg_a is None or leg_b is None:
+                    return {"response": "Missing parameters for right triangle visualization."}
+
+                filepath = draw_right_triangle(leg_a, leg_b)
                 return FileResponse(filepath, media_type="image/png")
 
             elif shape == "rectangle":
