@@ -75,7 +75,7 @@ def extract_numeric_parameters(user_message: str) -> dict:
     Extract all numeric parameters from the user message.
     Supports phrases like 'base is 5, height is 4', or 'x1 is 0, y1 is 0, x2 is 5, y2 is 0, x3 is 3, y3 is 4'.
     """
-    param_regex = r"(?P<key>\b(?:leg_a|leg_b|radius|side_a|side_b|side_c|width|height)\b)\s*(is|of)\s*(?P<value>\d+(\.\d+)?)"
+    param_regex = r"(?P<key>\b(?:leg|leg_a|leg_b|radius|side_a|side_b|side_c|width|height)\b)\s*(is|of)?\s*(?P<value>\d+(\.\d+)?)"
     matches = re.findall(param_regex, user_message.lower())
     return {match[0]: float(match[2]) for match in matches}
 
@@ -251,8 +251,15 @@ async def chat_with_bot(message: Message):
                     # For right triangle
                     leg_a = params.get("leg_a")
                     leg_b = params.get("leg_b")
+                    
                     if leg_a is None or leg_b is None:
-                            return {"response": "Please provide both leg_a and leg_b to illustrate a right triangle."}
+                        legs = [v for k, v in parameters.items() if "leg" in k]
+                        if len(legs) >= 2:
+                            leg_a, leg_b = legs[:2]
+
+                    if leg_a is None or leg_b is None:
+                        return {"response": "Please provide both leg_a and leg_b to illustrate a right triangle."}
+                    
                     filepath = draw_right_triangle(leg_a, leg_b)
                 else:
                     # For generic triangle
