@@ -57,7 +57,7 @@ def is_math_related(user_message: str) -> bool:
         "similar", "scale factor", "ratio", "proportions", "adjacent",
         "opposite", "hypotenuse", "angles", "degrees", "radians",
         "tan", "sin", "cos", "sec", "cosec", "cot", "logarithm", "log",
-        "factorial"
+        "factorial", "fractal"
     ]
 
     # Combine math symbols and geometry-related keywords
