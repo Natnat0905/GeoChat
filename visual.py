@@ -57,7 +57,7 @@ def is_math_related(user_message: str) -> bool:
         "similar", "scale factor", "ratio", "proportions", "adjacent",
         "opposite", "hypotenuse", "angles", "degrees", "radians",
         "tan", "sin", "cos", "sec", "cosec", "cot", "logarithm", "log",
-        "factorial", "fractal"
+        "factorial", "fractal", "parallel"
     ]
 
     # Combine math symbols and geometry-related keywords
@@ -127,7 +127,7 @@ def get_gpt_response(user_message: str) -> dict:
 
         # Call OpenAI's ChatCompletion endpoint
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             messages=messages,
             max_tokens=500,
             temperature=0.7,
