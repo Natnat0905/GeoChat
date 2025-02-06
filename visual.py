@@ -31,45 +31,6 @@ openai.api_key = os.getenv("OPENAI_API_KEY")  # Ensure this is set in Railway's 
 class Message(BaseModel):
     user_message: str
 
-# Function to check if a message is math-related
-def is_math_related(user_message: str) -> bool:
-    """
-    Check if the user's message is math-related using keywords and patterns.
-    """
-    math_symbols = [
-        "+", "-", "*", "/", "=", "^", "%", "π", "∑", "√", "∫", "≠", "<", ">", "≤", "≥", "≈", "∼", "∝", "∞",
-        "!", "∂", "Δ", "∇", "∩", "∪", "⊂", "⊃", "⊆", "⊇", "⊕", "⊗", "∴", "∵", "±", "∓", "|", "∣", "∥", "⊥",
-        "→", "↔", "↦", "⇒", "⇔", "∈", "∉", "∋", "∀", "∃", "∅", "∓", "∖", "ℝ", "ℤ", "ℚ", "ℕ", "ℂ", "ℙ", "÷","×"
-                ]
-    
-    geometry_keywords = [
-        "triangle", "geometry", "area", "perimeter", "angle", "isosceles",
-        "equilateral", "scalene", "acute", "obtuse", "right triangle",
-        "circle", "radius", "diameter", "chord", "arc", "sector",
-        "circumference", "square", "rectangle", "parallelogram",
-        "rhombus", "trapezoid", "quadrilateral", "polygon", "pentagon",
-        "hexagon", "octagon", "surface area", "volume", "prism", "pyramid",
-        "sphere", "cone", "cylinder", "base", "height", "altitude",
-        "Pythagorean theorem", "midpoint", "distance formula",
-        "slope", "coordinate plane", "axes", "x-axis", "y-axis", "origin",
-        "geometry problem", "geometry tutor", "7th grade", "8th grade",
-        "9th grade", "10th grade", "line segment", "congruent",
-        "similar", "scale factor", "ratio", "proportions", "adjacent",
-        "opposite", "hypotenuse", "angles", "degrees", "radians",
-        "tan", "sin", "cos", "sec", "cosec", "cot", "logarithm", "log",
-        "factorial", "fractal", "parallel"
-    ]
-
-    # Combine math symbols and geometry-related keywords
-    math_related_keywords = math_symbols + geometry_keywords
-
-    # Convert the message to lowercase for case-insensitive matching
-    user_message = user_message.lower()
-
-    # Check if any math-related keyword or symbol exists in the message
-    return any(keyword in user_message for keyword in math_related_keywords)
-    
-
 def extract_numeric_parameters(user_message: str) -> dict:
     """
     Extract all numeric parameters from the user message.
@@ -109,17 +70,18 @@ def get_gpt_response(user_message: str) -> dict:
     Handles both plain-text explanations and structured parameters for illustrations.
     """
     try:
-        # GPT system prompt tailored to handle both explanations and visualization parameters
+        # GPT system prompt that asks GPT to decide if the question is math/geometry related
         messages = [
             {
                 "role": "system",
                 "content": (
                     "You are a geometry assistant for grades 7 to 10. Your tasks are:"
                     "\n1. Explain geometry concepts clearly using plain math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi)."
-                    "\n2. For visualization requests (e.g., 'Draw a right triangle with legs 6 and 7'), respond with a Python dictionary containing:"
+                    "\n2. For visualization requests (e.g., 'Draw a right triangle with legs 6 and 7'), respond with a Python dictionary containing:" 
                     "\n    - 'shape': the type of shape (e.g., 'triangle', 'circle', 'rectangle')."
                     "\n    - 'parameters': a dictionary of parameters (e.g., {'leg_a': 6, 'leg_b': 7})."
-                    "\n3. Ensure structured responses for visualization requests. For plain explanations, return text only."
+                    "\n3. If the user asks for something unrelated to geometry, you must respond with the following message:"
+                    "\n    'I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question.'"
                 ),
             },
             {"role": "user", "content": user_message},
@@ -137,6 +99,10 @@ def get_gpt_response(user_message: str) -> dict:
         gpt_output = response["choices"][0]["message"]["content"].strip()
         logging.info(f"GPT Output: {gpt_output}")
 
+        # If the GPT response is the predefined message about geometry
+        if gpt_output == "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question.":
+            return {"response": gpt_output}
+
         # Attempt to parse the response as a dictionary for visualization
         try:
             parsed_response = eval(gpt_output)  # Ensure GPT outputs a valid Python dictionary
@@ -152,7 +118,6 @@ def get_gpt_response(user_message: str) -> dict:
     except Exception as e:
         logging.error(f"Error communicating with GPT: {str(e)}")
         raise HTTPException(status_code=500, detail="Error communicating with GPT")
-
 
 # Middleware to log all incoming requests
 @app.middleware("http")
@@ -179,13 +144,15 @@ async def chat_with_bot(message: Message):
         user_message = message.user_message
         logging.info(f"Received message: {user_message}")
 
-        # Step 1: Check if the question is math-related
-        if not is_math_related(user_message):
-            non_math_response = "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question."
-            logging.info(f"Non-geometry question detected. Response: {non_math_response}")
-            return {"response": non_math_response}
+        # Step 1: Use GPT to process the message (GPT decides if it's math-related)
+        gpt_response = get_gpt_response(user_message)
+        logging.info(f"GPT Response: {gpt_response}")
 
-        # Step 2: Check if "illustrate" is explicitly mentioned
+        # Step 2: If GPT responds with the non-math response, return it
+        if isinstance(gpt_response, dict) and "response" in gpt_response and gpt_response["response"] == "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question.":
+            return {"response": gpt_response["response"]}
+
+        # Step 3: Check if "illustrate" is explicitly mentioned in the message
         if "illustrate" in user_message.lower():
             # Extract numeric parameters manually
             parameters = extract_numeric_parameters(user_message)
@@ -196,14 +163,14 @@ async def chat_with_bot(message: Message):
                 filepath = draw_circle(radius)
                 return FileResponse(filepath, media_type="image/png")
             
-             # Handle right triangle visualization
+            # Handle right triangle visualization
             if "right triangle" in user_message:
                 leg_a = parameters.get("leg_a", 3)  # Default leg_a = 3
                 leg_b = parameters.get("leg_b", 4)  # Default leg_b = 4
                 filepath = draw_right_triangle(leg_a, leg_b)
                 return FileResponse(filepath, media_type="image/png")
     
-             # Handle generic triangle visualization
+            # Handle generic triangle visualization
             if "triangle" in user_message:
                 side_a = parameters.get("side_a", 5)
                 side_b = parameters.get("side_b", 10)
@@ -232,11 +199,7 @@ async def chat_with_bot(message: Message):
 
             return {"response": "Sorry, I couldn't create an illustration for that request."}
 
-        # Step 3: Use GPT to process the message if "illustrate" is not mentioned
-        gpt_response = get_gpt_response(user_message)
-        logging.info(f"GPT Response: {gpt_response}")
-
-        # Step 4: Handle structured GPT response
+        # Step 4: Handle structured GPT response if "illustrate" is not mentioned
         if isinstance(gpt_response, dict) and "shape" in gpt_response:
             shape = gpt_response["shape"]
             params = gpt_response["parameters"]
@@ -273,7 +236,7 @@ async def chat_with_bot(message: Message):
         # Step 5: Handle plain-text GPT response
         if isinstance(gpt_response, dict) and "response" in gpt_response:
             # Extract the "response" value and send it as plain text
-            return PlainTextResponse(content=gpt_response["response"])  # Use PlainTextResponse here
+            return PlainTextResponse(content=gpt_response["response"])
 
         # Default fallback
         return {"response": "Sorry, I couldn't understand your request."}
