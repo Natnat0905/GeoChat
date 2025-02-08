@@ -65,23 +65,17 @@ def convert_to_plain_math(response: str) -> str:
 
 # Function to interact with OpenAI's GPT
 def get_gpt_response(user_message: str) -> dict:
-    """
-    Use GPT to process the user's message and optionally return parameters for visualization.
-    Handles both plain-text explanations and structured parameters for illustrations.
-    """
     try:
-        # GPT system prompt that asks GPT to decide if the question is math/geometry related
+        # Updated system prompt to handle all math questions
         messages = [
             {
                 "role": "system",
                 "content": (
-                    "You are a geometry assistant for grades 7 to 10. Your tasks are:"
-                    "\n1. Explain geometry concepts clearly using plain math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi)."
-                    "\n2. For visualization requests (e.g., 'Draw a right triangle with legs 6 and 7'), respond with a Python dictionary containing:" 
-                    "\n    - 'shape': the type of shape (e.g., 'triangle', 'circle', 'rectangle')."
-                    "\n    - 'parameters': a dictionary of parameters (e.g., {'leg_a': 6, 'leg_b': 7})."
-                    "\n3. If the user asks for something unrelated to geometry, you must respond with the following message:"
-                    "\n    'I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question.'"
+                    "You are a math assistant. Your tasks are:\n"
+                    "1. Answer all math-related questions, from basic arithmetic to advanced topics like algebra, calculus, trigonometry, etc.\n"
+                    "2. Provide clear, concise explanations using standard math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi).\n"
+                    "3. If a question requires visualizing a mathematical shape or graph, provide the corresponding illustration in Python format.\n"
+                    "4. If the question doesn't require a visualization, respond with a plain-text explanation."
                 ),
             },
             {"role": "user", "content": user_message},
@@ -89,7 +83,7 @@ def get_gpt_response(user_message: str) -> dict:
 
         # Call OpenAI's ChatCompletion endpoint
         response = openai.ChatCompletion.create(
-            model="gpt-4",  # Change from "gpt-4" to "gpt-3.5-turbo"
+            model="gpt-4",  
             messages=messages,
             max_tokens=500,
             temperature=0.7,
