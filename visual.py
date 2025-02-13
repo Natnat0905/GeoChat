@@ -83,7 +83,7 @@ def get_gpt_response(user_message: str) -> dict:
 
         # Call OpenAI's ChatCompletion endpoint
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  
+            model="gpt-4",  #gpt-3.5-turbo
             messages=messages,
             max_tokens=500,
             temperature=0.7,
