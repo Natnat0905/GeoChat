@@ -1,6 +1,7 @@
 import openai
 import os
 import re
+import time
 import logging
 import asyncio
 from fastapi import FastAPI, HTTPException, Request
@@ -63,6 +64,7 @@ def convert_to_plain_math(response: str) -> str:
     return response.strip()
 
 # Function to interact with OpenAI's GPT with retry and timeout handling
+# Function to interact with OpenAI's GPT with retry and timeout handling
 def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay: int = 5) -> dict:
     """
     Retry logic for handling slow responses or timeouts from OpenAI.
@@ -84,13 +86,13 @@ def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay: int 
                 {"role": "user", "content": user_message},
             ]
             
-            # Call OpenAI's ChatCompletion endpoint without awaiting, process synchronously
+            # Call OpenAI's ChatCompletion endpoint with timeout
             response = openai.ChatCompletion.create(
                 model="gpt-4",  #gpt-3.5-turbo
                 messages=messages,
                 max_tokens=500,
                 temperature=0.7,
-                timeout=60,  # Timeout for the request
+                timeout=120,  # Increase timeout for long responses
             )
 
             gpt_output = response["choices"][0]["message"]["content"].strip()
