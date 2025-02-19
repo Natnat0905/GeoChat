@@ -7,6 +7,7 @@ import asyncio
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import JSONResponse  # Import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from illustration import draw_circle, draw_right_triangle, draw_rectangle, plot_trigonometric_function, draw_generic_triangle  # Import required functions
 
@@ -157,7 +158,7 @@ async def chat_with_bot(message: Message):
 
         # Step 2: If GPT responds with the non-math response, return it
         if isinstance(gpt_response, dict) and "response" in gpt_response and gpt_response["response"] == "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question.":
-            return {"response": gpt_response["response"]}
+            return JSONResponse(content={"response": gpt_response["response"]}, status_code=200)
 
         # Step 3: Check if "illustrate" is explicitly mentioned in the message
         if "illustrate" in user_message.lower():
@@ -187,7 +188,7 @@ async def chat_with_bot(message: Message):
                     return FileResponse(filepath, media_type="image/png")
                 except ValueError as e:
                     logging.error(str(e))
-                    return {"response": str(e)}
+                    return JSONResponse(content={"response": str(e)}, status_code=400)
                 
             if "rectangle" in user_message:
                 width = parameters.get("width", 5)
@@ -204,7 +205,7 @@ async def chat_with_bot(message: Message):
                     filepath = plot_trigonometric_function("tan")
                 return FileResponse(filepath, media_type="image/png")
 
-            return {"response": "Sorry, I couldn't create an illustration for that request."}
+            return JSONResponse(content={"response": "Sorry, I couldn't create an illustration for that request."}, status_code=400)
 
         # Step 4: Handle structured GPT response if "illustrate" is not mentioned
         if isinstance(gpt_response, dict) and "shape" in gpt_response:
@@ -222,7 +223,7 @@ async def chat_with_bot(message: Message):
                 leg_b = params.get("leg_b")
 
                 if leg_a is None or leg_b is None:
-                    return {"response": "Missing parameters for right triangle visualization."}
+                    return JSONResponse(content={"response": "Missing parameters for right triangle visualization."}, status_code=400)
 
                 filepath = draw_right_triangle(leg_a, leg_b)
                 return FileResponse(filepath, media_type="image/png")
@@ -238,16 +239,16 @@ async def chat_with_bot(message: Message):
                 filepath = plot_trigonometric_function(function)
                 return FileResponse(filepath, media_type="image/png")
 
-            return {"response": "Sorry, I couldn't create an illustration for that request."}
+            return JSONResponse(content={"response": "Sorry, I couldn't create an illustration for that request."}, status_code=400)
 
         # Step 5: Handle plain-text GPT response
         if isinstance(gpt_response, dict) and "response" in gpt_response:
             # Extract the "response" value and send it as plain text
-            return PlainTextResponse(content=gpt_response["response"])
+            return JSONResponse(content={"response": gpt_response["response"]}, status_code=200)
 
         # Default fallback
-        return {"response": "Sorry, I couldn't understand your request."}
+        return JSONResponse(content={"response": "Sorry, I couldn't understand your request."}, status_code=400)
 
     except Exception as e:
         logging.error(f"Error processing message: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        return JSONResponse(content={"response": "Internal Server Error"}, status_code=500)
