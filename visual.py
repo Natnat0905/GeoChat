@@ -63,7 +63,7 @@ def convert_to_plain_math(response: str) -> str:
     return response.strip()
 
 # Function to interact with OpenAI's GPT with retry and timeout handling
-async def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay: int = 5) -> dict:
+def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay: int = 5) -> dict:
     """
     Retry logic for handling slow responses or timeouts from OpenAI.
     """
@@ -84,8 +84,8 @@ async def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay
                 {"role": "user", "content": user_message},
             ]
             
-            # Call OpenAI's ChatCompletion endpoint with timeout
-            response = await openai.ChatCompletion.create(
+            # Call OpenAI's ChatCompletion endpoint without awaiting, process synchronously
+            response = openai.ChatCompletion.create(
                 model="gpt-4",  #gpt-3.5-turbo
                 messages=messages,
                 max_tokens=500,
@@ -115,7 +115,7 @@ async def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay
             logging.error(f"Timeout error occurred: {timeout_error}")
             if attempt < retries - 1:
                 logging.info(f"Retrying ({attempt + 1}/{retries})...")
-                await asyncio.sleep(delay)
+                time.sleep(delay)
             else:
                 return {"response": "Request timed out. Please try again later."}
         except Exception as e:
@@ -150,7 +150,7 @@ async def chat_with_bot(message: Message):
         logging.info(f"Received message: {user_message}")
 
         # Step 1: Use GPT to process the message (GPT decides if it's math-related)
-        gpt_response = await get_gpt_response_with_retry(user_message)
+        gpt_response = get_gpt_response_with_retry(user_message)
         logging.info(f"GPT Response: {gpt_response}")
 
         # Step 2: If GPT responds with the non-math response, return it
