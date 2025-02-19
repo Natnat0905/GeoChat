@@ -2,12 +2,11 @@ import openai
 import os
 import re
 import logging
+import asyncio
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
-from fastapi.responses import FileResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
-import matplotlib.pyplot as plt
-import numpy as np
 from illustration import draw_circle, draw_right_triangle, draw_rectangle, plot_trigonometric_function, draw_generic_triangle  # Import required functions
 
 # Initialize the FastAPI app
@@ -63,55 +62,67 @@ def convert_to_plain_math(response: str) -> str:
     response = response.replace("\\", "")
     return response.strip()
 
-# Function to interact with OpenAI's GPT
-def get_gpt_response(user_message: str) -> dict:
-    try:
-        # Updated system prompt to handle all math questions
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a math assistant. Your tasks are:\n"
-                    "1. Answer all math-related questions, from basic arithmetic to advanced topics like algebra, calculus, trigonometry, etc.\n"
-                    "2. Provide clear, concise explanations using standard math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi).\n"
-                    "3. If a question requires visualizing a mathematical shape or graph, provide the corresponding illustration in Python format.\n"
-                    "4. If the question doesn't require a visualization, respond with a plain-text explanation."
-                ),
-            },
-            {"role": "user", "content": user_message},
-        ]
-
-        # Call OpenAI's ChatCompletion endpoint
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  #gpt-3.5-turbo
-            messages=messages,
-            max_tokens=500,
-            temperature=0.7,
-        )
-
-        # Extract GPT response
-        gpt_output = response["choices"][0]["message"]["content"].strip()
-        logging.info(f"GPT Output: {gpt_output}")
-
-        # If the GPT response is the predefined message about geometry
-        if gpt_output == "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question.":
-            return {"response": gpt_output}
-
-        # Attempt to parse the response as a dictionary for visualization
+# Function to interact with OpenAI's GPT with retry and timeout handling
+async def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay: int = 5) -> dict:
+    """
+    Retry logic for handling slow responses or timeouts from OpenAI.
+    """
+    for attempt in range(retries):
         try:
-            parsed_response = eval(gpt_output)  # Ensure GPT outputs a valid Python dictionary
-            if isinstance(parsed_response, dict) and "shape" in parsed_response and "parameters" in parsed_response:
-                # If valid parameters for visualization are detected
-                return parsed_response
-        except Exception:
-            pass  # If parsing fails, treat the output as plain text
+            # Updated system prompt to handle all math questions
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a math assistant. Your tasks are:\n"
+                        "1. Answer all math-related questions, from basic arithmetic to advanced topics like algebra, calculus, trigonometry, etc.\n"
+                        "2. Provide clear, concise explanations using standard math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi).\n"
+                        "3. If a question requires visualizing a mathematical shape or graph, provide the corresponding illustration in Python format.\n"
+                        "4. If the question doesn't require a visualization, respond with a plain-text explanation."
+                    ),
+                },
+                {"role": "user", "content": user_message},
+            ]
+            
+            # Call OpenAI's ChatCompletion endpoint with timeout
+            response = await openai.ChatCompletion.create(
+                model="gpt-4",  #gpt-3.5-turbo
+                messages=messages,
+                max_tokens=500,
+                temperature=0.7,
+                timeout=60,  # Timeout for the request
+            )
 
-        # If not a visualization request, return plain-text explanation
-        return {"response": convert_to_plain_math(gpt_output)}
+            gpt_output = response["choices"][0]["message"]["content"].strip()
+            logging.info(f"GPT Output: {gpt_output}")
 
-    except Exception as e:
-        logging.error(f"Error communicating with GPT: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error communicating with GPT")
+            if gpt_output == "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question.":
+                return {"response": gpt_output}
+
+            # Attempt to parse the response as a dictionary for visualization
+            try:
+                parsed_response = eval(gpt_output)  # Ensure GPT outputs a valid Python dictionary
+                if isinstance(parsed_response, dict) and "shape" in parsed_response and "parameters" in parsed_response:
+                    # If valid parameters for visualization are detected
+                    return parsed_response
+            except Exception:
+                pass  # If parsing fails, treat the output as plain text
+
+            # If not a visualization request, return plain-text explanation
+            return {"response": convert_to_plain_math(gpt_output)}
+
+        except openai.error.Timeout as timeout_error:
+            logging.error(f"Timeout error occurred: {timeout_error}")
+            if attempt < retries - 1:
+                logging.info(f"Retrying ({attempt + 1}/{retries})...")
+                await asyncio.sleep(delay)
+            else:
+                return {"response": "Request timed out. Please try again later."}
+        except Exception as e:
+            logging.error(f"Error occurred: {e}")
+            return {"response": "An error occurred. Please try again later."}
+    
+    return {"response": "Unable to get a valid response after multiple attempts. Please try again later."}
 
 # Middleware to log all incoming requests
 @app.middleware("http")
@@ -139,7 +150,7 @@ async def chat_with_bot(message: Message):
         logging.info(f"Received message: {user_message}")
 
         # Step 1: Use GPT to process the message (GPT decides if it's math-related)
-        gpt_response = get_gpt_response(user_message)
+        gpt_response = await get_gpt_response_with_retry(user_message)
         logging.info(f"GPT Response: {gpt_response}")
 
         # Step 2: If GPT responds with the non-math response, return it
