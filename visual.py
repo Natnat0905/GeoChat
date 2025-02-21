@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.responses import JSONResponse  # Import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from illustration import draw_circle, draw_right_triangle, draw_rectangle, plot_trigonometric_function, draw_generic_triangle  # Import required functions
+from responses import log_memory_usage
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -24,6 +25,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add the memory usage logging middleware
+app.middleware("http")(log_memory_usage)
 
 # Set your OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")  # Ensure this is set in Railway's environment variables
@@ -64,7 +68,6 @@ def convert_to_plain_math(response: str) -> str:
     response = response.replace("\\", "")
     return response.strip()
 
-# Function to interact with OpenAI's GPT with retry and timeout handling
 # Function to interact with OpenAI's GPT with retry and timeout handling
 def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay: int = 5) -> dict:
     """
