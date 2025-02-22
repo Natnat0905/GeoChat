@@ -11,7 +11,6 @@ from fastapi.responses import JSONResponse  # Import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from illustration import draw_circle, draw_right_triangle, draw_rectangle, plot_trigonometric_function, draw_generic_triangle  # Import required functions
 from responses import log_memory_usage
-from deepseek import call_deepseek_math
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -153,35 +152,10 @@ async def chat_with_bot(message: Message):
     """
     Chat endpoint to process user requests and create visualizations.
     Handles both structured GPT responses for visualization and plain-text explanations.
-    Also, uses DeepSeekMath for precise math computations when needed.
     """
     try:
         user_message = message.user_message
         logging.info(f"Received message: {user_message}")
-
-        # New Step: Use ChatGPT to classify if the query requires deep mathematical computation.
-        classification_prompt = (
-            f"Does this query require a precise mathematical computation "
-            f"that is best solved by a dedicated math model? Answer only 'yes' or 'no'. "
-            f"Query: {user_message}"
-        )
-        classification_response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a classifier for math queries."},
-                {"role": "user", "content": classification_prompt},
-            ],
-            max_tokens=10,
-            temperature=0
-        )
-        is_math = classification_response["choices"][0]["message"]["content"].strip().lower()
-        logging.info(f"Math classification: {is_math}")
-
-        if is_math == "yes":
-            deepseek_result = call_deepseek_math(user_message)
-            return PlainTextResponse(content=f"DeepSeekMath Result: {deepseek_result}", status_code=200)
-
-        # --- Existing code remains unchanged below ---
 
         # Step 1: Use GPT to process the message (GPT decides if it's math-related)
         gpt_response = get_gpt_response_with_retry(user_message)
@@ -195,17 +169,21 @@ async def chat_with_bot(message: Message):
         if "illustrate" in user_message.lower():
             # Extract numeric parameters manually
             parameters = extract_numeric_parameters(user_message)
-            # (Visualization handling code remains here unchanged.)
+
+            # Handle manual visualization requests
             if "circle" in user_message:
                 radius = parameters.get("radius", parameters.get("diameter", 10) / 2)
                 filepath = draw_circle(radius)
                 return FileResponse(filepath, media_type="image/png")
-            # Additional visualization cases...
+            
+            # Handle right triangle visualization
             if "right triangle" in user_message:
-                leg_a = parameters.get("leg_a", 3)
-                leg_b = parameters.get("leg_b", 4)
+                leg_a = parameters.get("leg_a", 3)  # Default leg_a = 3
+                leg_b = parameters.get("leg_b", 4)  # Default leg_b = 4
                 filepath = draw_right_triangle(leg_a, leg_b)
                 return FileResponse(filepath, media_type="image/png")
+    
+            # Handle generic triangle visualization
             if "triangle" in user_message:
                 side_a = parameters.get("side_a", 5)
                 side_b = parameters.get("side_b", 10)
@@ -216,11 +194,13 @@ async def chat_with_bot(message: Message):
                 except ValueError as e:
                     logging.error(str(e))
                     return JSONResponse(content={"response": str(e)}, status_code=400)
+                
             if "rectangle" in user_message:
                 width = parameters.get("width", 5)
                 height = parameters.get("height", 3)
                 filepath = draw_rectangle(width, height)
                 return FileResponse(filepath, media_type="image/png")
+
             if "sin" in user_message or "cos" in user_message or "tan" in user_message:
                 if "sin" in user_message:
                     filepath = plot_trigonometric_function("sin")
@@ -229,35 +209,44 @@ async def chat_with_bot(message: Message):
                 elif "tan" in user_message:
                     filepath = plot_trigonometric_function("tan")
                 return FileResponse(filepath, media_type="image/png")
+
             return PlainTextResponse(content="Sorry, I couldn't create an illustration for that request.", status_code=400)
 
         # Step 4: Handle structured GPT response if "illustrate" is not mentioned
         if isinstance(gpt_response, dict) and "shape" in gpt_response:
             shape = gpt_response["shape"]
             params = gpt_response["parameters"]
+
+            # Handle GPT-generated visualizations
             if shape == "circle":
-                radius = params.get("radius", 5)
+                radius = params.get("radius", 5)  # Default radius is 5
                 filepath = draw_circle(radius)
                 return FileResponse(filepath, media_type="image/png")
+
             if shape == "triangle" and params.get("type") == "right":
                 leg_a = params.get("leg_a")
                 leg_b = params.get("leg_b")
+
                 if leg_a is None or leg_b is None:
                     return PlainTextResponse(content="Missing parameters for right triangle visualization.", status_code=400)
+
                 filepath = draw_right_triangle(leg_a, leg_b)
                 return FileResponse(filepath, media_type="image/png")
+
             elif shape == "rectangle":
                 width = params.get("width", 5)
                 height = params.get("height", 3)
                 filepath = draw_rectangle(width, height)
                 return FileResponse(filepath, media_type="image/png")
+
             elif shape == "trigonometric":
-                function = params.get("function", "sin")
+                function = params.get("function", "sin")  # Default to sin
                 filepath = plot_trigonometric_function(function)
                 return FileResponse(filepath, media_type="image/png")
+
             return PlainTextResponse(content="Sorry, I couldn't create an illustration for that request.", status_code=400)
 
-        # Step 5: Handle plain-text GPT responses
+        # Step 5: Handle plain-text GPT
         return PlainTextResponse(content=gpt_response["response"], status_code=200)
 
     except Exception as e:
