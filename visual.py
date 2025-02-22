@@ -92,7 +92,7 @@ def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay: int 
             
             # Call OpenAI's ChatCompletion endpoint with timeout
             response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",  #gpt-3.5-turbo
+                model="o3-mini",  #gpt-3.5-turbo
                 messages=messages,
                 max_tokens=500,
                 temperature=0.7,
