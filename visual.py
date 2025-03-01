@@ -2,12 +2,12 @@ import openai
 import os
 import re
 import time
+import json
 import logging
 import asyncio
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
-from fastapi.responses import FileResponse, PlainTextResponse
-from fastapi.responses import JSONResponse  # Import JSONResponse
+from fastapi.responses import FileResponse, PlainTextResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from illustration import draw_circle, draw_right_triangle, draw_rectangle, plot_trigonometric_function, draw_generic_triangle  # Import required functions
 from responses import log_memory_usage
@@ -41,7 +41,7 @@ def extract_numeric_parameters(user_message: str) -> dict:
     Extract all numeric parameters from the user message.
     Supports phrases like 'base is 5, height is 4', or 'x1 is 0, y1 is 0, x2 is 5, y2 is 0, x3 is 3, y3 is 4'.
     """
-    param_regex = r"(?P<key>\b(?:leg|leg_a|leg_b|radius|side_a|side_b|side_c|width|height)\b)\s*(is|of)?\s*(?P<value>\d+(\.\d+)?)"
+    param_regex = r"(?P<key>\b(?:leg|leg_a|leg_b|radius|side_a|side_b|side_c|width|height)\b)\s*(?:is|of|:)?\s*(-?\d+(\.\d+)?)"
     matches = re.findall(param_regex, user_message.lower())
     return {match[0]: float(match[2]) for match in matches}
 
@@ -83,7 +83,8 @@ def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay: int 
                         "You are a math assistant. Your tasks are:\n"
                         "1. Answer all math-related questions, from basic arithmetic to advanced topics like algebra, calculus, trigonometry, etc.\n"
                         "2. Provide clear, concise explanations using standard math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi).\n"
-                        "3. If a question requires visualizing a mathematical shape or graph, provide the corresponding illustration in Python format.\n"
+                        "3. If a question requires visualizing a mathematical shape or graph, output JSON with the format: "
+                        "{'shape': 'circle', 'parameters': {'radius': 5}}. Use only this JSON format."
                         "4. If the question doesn't require a visualization, respond with a plain-text explanation."
                     ),
                 },
@@ -110,14 +111,14 @@ def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay: int 
 
             # Check for JSON-style responses (for visualizations)
             try:
-                parsed_response = eval(gpt_output)  # Ensure GPT outputs a valid Python dictionary
+                parsed_response = json.loads(gpt_output)  # Ensure GPT outputs a valid Python dictionary
                 if isinstance(parsed_response, dict) and "shape" in parsed_response and "parameters" in parsed_response:
                     return parsed_response  # Return structured data for visualizations
             except Exception:
                 pass  # If parsing fails, treat the output as plain text
 
-            # Return plain-text response after cleaning up LaTeX math
             return {"response": clean_output}
+
 
         except openai.error.Timeout as timeout_error:
             logging.error(f"Timeout error occurred: {timeout_error}")
@@ -161,12 +162,14 @@ async def chat_with_bot(message: Message):
         gpt_response = get_gpt_response_with_retry(user_message)
         logging.info(f"GPT Response: {gpt_response}")
 
-        # Step 2: If GPT responds with the non-math response, return it
+         # Step 2: If GPT responds with the non-math response, return it
         if isinstance(gpt_response, dict) and "response" in gpt_response and gpt_response["response"] == "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question.":
             return PlainTextResponse(content=gpt_response["response"], status_code=200)
 
+        text_response = gpt_response.get("response", "I couldn't process your request.")
+
         # Step 3: Check if "illustrate" is explicitly mentioned in the message
-        if "illustrate" in user_message.lower():
+        if any(keyword in user_message.lower() for keyword in ["illustrate", "show", "visualize", "plot", "draw"]):
             # Extract numeric parameters manually
             parameters = extract_numeric_parameters(user_message)
 
@@ -247,7 +250,12 @@ async def chat_with_bot(message: Message):
             return PlainTextResponse(content="Sorry, I couldn't create an illustration for that request.", status_code=400)
 
         # Step 5: Handle plain-text GPT
-        return PlainTextResponse(content=gpt_response["response"], status_code=200)
+        response_data = {"response": text_response}
+
+        if filepath:
+            response_data["illustration"] = filepath
+
+        return JSONResponse(content=response_data)
 
     except Exception as e:
         logging.error(f"Error occurred: {e}")
