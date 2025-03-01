@@ -1,10 +1,20 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import logging
+import io
 
-def draw_circle(radius: float) -> str:
+def generate_image(fig) -> bytes:
     """
-    Draw a circle based on the provided radius.
+    Convert a Matplotlib figure into a byte stream (PNG format).
+    """
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    buf.seek(0)
+    plt.close(fig)
+    return buf.getvalue()
+
+def draw_circle(radius: float) -> bytes:
+    """
+    Draw a circle and return the image as a byte stream.
     """
     fig, ax = plt.subplots()
     circle = plt.Circle((0, 0), radius, fill=False, color="blue", linewidth=2)
@@ -14,14 +24,11 @@ def draw_circle(radius: float) -> str:
     ax.set_aspect('equal', 'box')
     ax.set_title(f"Circle with Radius {radius}")
     plt.grid(True)
-    filepath = "circle_plot.png"
-    plt.savefig(filepath)
-    plt.close(fig)
-    return filepath
+    return generate_image(fig)
 
-def draw_right_triangle(leg_a: float, leg_b: float) -> str:
+def draw_right_triangle(leg_a: float, leg_b: float) -> bytes:
     """
-    Draw a right triangle with two legs: leg_a (x-axis) and leg_b (y-axis).
+    Draw a right triangle and return the image as a byte stream.
     """
     fig, ax = plt.subplots()
     points = np.array([[0, 0], [leg_a, 0], [0, leg_b]])
@@ -34,28 +41,19 @@ def draw_right_triangle(leg_a: float, leg_b: float) -> str:
     ax.set_title(f"Right Triangle (Leg A={leg_a}, Leg B={leg_b})")
     plt.grid(True)
 
-    filepath = "right_triangle_plot.png"
-    plt.savefig(filepath)
-    plt.close(fig)
-    return filepath
+    return generate_image(fig)
 
-
-def draw_generic_triangle(side_a: float, side_b: float, side_c: float) -> str:
+def draw_generic_triangle(side_a: float, side_b: float, side_c: float) -> bytes:
     """
-    Draw a generic triangle based on three side lengths (side_a, side_b, side_c).
-    Validates the Triangle Inequality Theorem before plotting.
+    Draw a generic triangle and return the image as a byte stream.
     """
-    # Validate Triangle Inequality Theorem
     if (
         side_a + side_b <= side_c
         or side_a + side_c <= side_b
         or side_b + side_c <= side_a
     ):
-        raise ValueError(
-            "Invalid side lengths: Triangle Inequality Theorem violated. Cannot plot the triangle."
-        )
+        raise ValueError("Invalid triangle: Triangle Inequality Theorem violated.")
 
-    # Calculate approximate triangle vertices
     x1, y1 = 0, 0
     x2, y2 = side_a, 0
     x3 = (side_a**2 + side_b**2 - side_c**2) / (2 * side_a)
@@ -72,14 +70,11 @@ def draw_generic_triangle(side_a: float, side_b: float, side_c: float) -> str:
     ax.set_title("Triangle")
     plt.grid(True)
 
-    filepath = "generic_triangle_plot.png"
-    plt.savefig(filepath)
-    plt.close(fig)
-    return filepath
+    return generate_image(fig)
 
-def draw_rectangle(width: float, height: float) -> str:
+def draw_rectangle(width: float, height: float) -> bytes:
     """
-    Draw a rectangle based on the provided width and height.
+    Draw a rectangle and return the image as a byte stream.
     """
     fig, ax = plt.subplots()
     rectangle = plt.Rectangle((0, 0), width, height, fill=None, edgecolor="green", linewidth=2)
@@ -89,14 +84,11 @@ def draw_rectangle(width: float, height: float) -> str:
     ax.set_aspect('equal', 'box')
     ax.set_title(f"Rectangle ({width}x{height})")
     plt.grid(True)
-    filepath = "rectangle_plot.png"
-    plt.savefig(filepath)
-    plt.close(fig)
-    return filepath
+    return generate_image(fig)
 
-def plot_trigonometric_function(function: str) -> str:
+def plot_trigonometric_function(function: str) -> bytes:
     """
-    Plot a trigonometric function such as sine, cosine, or tangent.
+    Plot a trigonometric function (sin, cos, tan) and return the image as a byte stream.
     """
     x = np.linspace(0, 2 * np.pi, 500)
     if function == "sin":
@@ -119,7 +111,5 @@ def plot_trigonometric_function(function: str) -> str:
     ax.legend()
     ax.set_title(title)
     ax.grid(True)
-    filepath = f"{title.replace(' ', '_').lower()}.png"
-    plt.savefig(filepath)
-    plt.close(fig)
-    return filepath
+    
+    return generate_image(fig)

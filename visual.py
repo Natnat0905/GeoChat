@@ -1,16 +1,18 @@
 import openai
 import os
 import re
+import io
 import time
 import json
 import logging
 import asyncio
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
-from fastapi.responses import FileResponse, PlainTextResponse, JSONResponse
+from fastapi.responses import FileResponse, PlainTextResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from illustration import draw_circle, draw_right_triangle, draw_rectangle, plot_trigonometric_function, draw_generic_triangle  # Import required functions
 from responses import log_memory_usage
+import matplotlib.pyplot as plt
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -72,53 +74,54 @@ def convert_to_plain_math(response: str) -> str:
 def get_gpt_response_with_retry(user_message: str, retries: int = 3, delay: int = 5) -> dict:
     """
     Retry logic for handling slow responses or timeouts from OpenAI.
+    Ensures GPT explicitly marks if visualization is needed.
     """
     for attempt in range(retries):
         try:
-            # Updated system prompt to handle all math questions
+            # Updated system prompt to handle all math and visualization-related questions
             messages = [
                 {
                     "role": "system",
                     "content": (
                         "You are a math assistant. Your tasks are:\n"
-                        "1. Answer all math-related questions, from basic arithmetic to advanced topics like algebra, calculus, trigonometry, etc.\n"
-                        "2. Provide clear, concise explanations using standard math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi).\n"
-                        "3. If a question requires visualizing a mathematical shape or graph, output JSON with the format: "
-                        "{'shape': 'circle', 'parameters': {'radius': 5}}. Use only this JSON format."
-                        "4. If the question doesn't require a visualization, respond with a plain-text explanation."
+                        "1. Answer all math-related questions, from basic arithmetic to advanced topics like algebra, calculus, and trigonometry.\n"
+                        "2. Provide clear explanations using standard math symbols (e.g., ² for squared, √ for square root, × for multiplication, π for pi).\n"
+                        "3. If the question requires visualizing a mathematical shape, output JSON in the format:\n"
+                        "{'shape': 'circle', 'parameters': {'radius': 5}, 'explanation': 'A circle is a set of all points equidistant from a center point.'}\n"
+                        "4. If the question does not require visualization, return only a plain-text explanation."
                     ),
                 },
                 {"role": "user", "content": user_message},
             ]
             
-            # Call OpenAI's ChatCompletion endpoint with timeout
+            # Call OpenAI's ChatCompletion API
             response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",  #gpt-3.5-turbo
+                model="gpt-3.5-turbo",
                 messages=messages,
                 max_tokens=500,
                 temperature=0.7,
-                timeout=120,  # Increase timeout for long responses
+                timeout=120,
             )
 
             gpt_output = response["choices"][0]["message"]["content"].strip()
             logging.info(f"GPT Output: {gpt_output}")
 
+            # If GPT says it can only assist with geometry, return text
             if gpt_output == "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question.":
                 return {"response": gpt_output}
 
             # Clean LaTeX-style math expressions
             clean_output = convert_to_plain_math(gpt_output)
 
-            # Check for JSON-style responses (for visualizations)
+            # Try parsing JSON response
             try:
-                parsed_response = json.loads(gpt_output)  # Ensure GPT outputs a valid Python dictionary
-                if isinstance(parsed_response, dict) and "shape" in parsed_response and "parameters" in parsed_response:
+                parsed_response = json.loads(gpt_output)
+                if isinstance(parsed_response, dict) and "shape" in parsed_response:
                     return parsed_response  # Return structured data for visualizations
             except Exception:
                 pass  # If parsing fails, treat the output as plain text
 
             return {"response": clean_output}
-
 
         except openai.error.Timeout as timeout_error:
             logging.error(f"Timeout error occurred: {timeout_error}")
@@ -153,77 +156,42 @@ async def root():
 async def chat_with_bot(message: Message):
     """
     Chat endpoint to process user requests and create visualizations.
-    Now ensures that if an image is generated, an explanation is also returned.
+    Now ensures that if an image is generated, an explanation is first returned.
     """
     try:
         user_message = message.user_message
         logging.info(f"Received message: {user_message}")
 
-        # Step 1: Use GPT to process the message
+        # Step 1: Get GPT response
         gpt_response = get_gpt_response_with_retry(user_message)
         logging.info(f"GPT Response: {gpt_response}")
         
         text_response = gpt_response.get("response", "I couldn't process your request.")
-        illustration_path = None
         
-        # Step 2: Check if user explicitly asks for visualization
-        if any(keyword in user_message.lower() for keyword in ["illustrate", "show", "visualize", "plot", "draw"]):
-            parameters = extract_numeric_parameters(user_message)
-            
-            # Handle different shape requests
-            if "circle" in user_message:
-                radius = parameters.get("radius", 5)
-                illustration_path = draw_circle(radius)
-                
-            elif "right triangle" in user_message:
-                leg_a = parameters.get("leg_a", 3)
-                leg_b = parameters.get("leg_b", 4)
-                illustration_path = draw_right_triangle(leg_a, leg_b)
-                
-            elif "triangle" in user_message:
-                side_a = parameters.get("side_a", 5)
-                side_b = parameters.get("side_b", 10)
-                side_c = parameters.get("side_c", 7)
-                illustration_path = draw_generic_triangle(side_a, side_b, side_c)
-                
-            elif "rectangle" in user_message:
-                width = parameters.get("width", 5)
-                height = parameters.get("height", 3)
-                illustration_path = draw_rectangle(width, height)
-                
-            elif any(trig in user_message for trig in ["sin", "cos", "tan"]):
-                function = "sin" if "sin" in user_message else "cos" if "cos" in user_message else "tan"
-                illustration_path = plot_trigonometric_function(function)
-                
-            if illustration_path:
-                return JSONResponse(content={
-                    "response": text_response,  # Ensure explanation is included
-                    "illustration": illustration_path
-                })
-            
-        # Step 3: If GPT provided a shape in JSON response
+        # Step 2: If GPT says an image is needed, generate it
         if isinstance(gpt_response, dict) and "shape" in gpt_response:
             shape = gpt_response["shape"]
             params = gpt_response["parameters"]
+            explanation = gpt_response.get("explanation", "Here is the visual representation.")
 
+            # Generate the image dynamically
             if shape == "circle":
-                illustration_path = draw_circle(params.get("radius", 5))
-            elif shape == "triangle" and params.get("type") == "right":
-                illustration_path = draw_right_triangle(params.get("leg_a"), params.get("leg_b"))
+                img_data = draw_circle(params.get("radius", 5))
             elif shape == "rectangle":
-                illustration_path = draw_rectangle(params.get("width", 5), params.get("height", 3))
+                img_data = draw_rectangle(params.get("width", 5), params.get("height", 5))
+            elif shape == "triangle" and params.get("type") == "right":
+                img_data = draw_right_triangle(params.get("leg_a"), params.get("leg_b"))
             elif shape == "trigonometric":
-                illustration_path = plot_trigonometric_function(params.get("function", "sin"))
-            
-            if illustration_path:
-                return JSONResponse(content={
-                    "response": text_response,  # Include the explanation
-                    "illustration": illustration_path
-                })
-        
-        # Step 4: If no image is generated, return text response only
+                img_data = plot_trigonometric_function(params.get("function", "sin"))
+            else:
+                return JSONResponse(content={"response": "Unsupported shape type."})
+
+            # Send explanation first
+            return JSONResponse(content={"response": explanation}), Response(content=img_data, media_type="image/png")
+
+        # Step 3: If no image is needed, return text response only
         return JSONResponse(content={"response": text_response})
-    
+
     except Exception as e:
         logging.error(f"Error occurred: {e}")
         return PlainTextResponse(content="An error occurred. Please try again later.", status_code=500)
