@@ -81,7 +81,14 @@ def draw_right_triangle(leg1: float, leg2: float) -> bytes:
     return generate_image(fig)
 
 def draw_rectangle(width: float, height: float) -> bytes:
-    """Generate rectangle visualization with area calculation"""
+    """Generate rectangle/square visualization with validation"""
+    # Ensure valid dimensions
+    width = max(0.1, float(width))
+    height = max(0.1, float(height))
+    
+    is_square = abs(width - height) < 0.01
+    title = f"Square ({width}cm)" if is_square else f"Rectangle ({width}cm × {height}cm)"
+    
     fig, ax = plt.subplots(figsize=(7, 6))
     
     # Create rectangle
@@ -89,20 +96,27 @@ def draw_rectangle(width: float, height: float) -> bytes:
                         fill=False, color='#17becf', linewidth=2.5)
     ax.add_patch(rect)
     
-    # Add measurements
-    ax.text(width/2, -0.1*height, f'Width: {width} cm', 
-           ha='center', va='top', color='#2ca02c')
-    ax.text(-0.1*width, height/2, f'Height: {height} cm', 
-           ha='right', va='center', rotation=90, color='#2ca02c')
-    ax.text(width/2, height/2, f'Area: {width*height} cm²', 
+    # Add measurements (only show one side for squares)
+    if not is_square:
+        ax.text(width/2, -0.1*height, f'Width: {width} cm', 
+               ha='center', va='top', color='#2ca02c')
+        ax.text(-0.1*width, height/2, f'Height: {height} cm', 
+               ha='right', va='center', rotation=90, color='#2ca02c')
+    else:
+        ax.text(width/2, -0.1*height, f'Side: {width} cm', 
+               ha='center', va='top', color='#2ca02c')
+    
+    ax.text(width/2, height/2, 
+           f'Area: {width*height} cm²' + (" (Square)" if is_square else ""), 
            ha='center', va='center', color='#d62728')
     
     # Configure plot
-    ax.set_xlim(-1, width + 1)
-    ax.set_ylim(-1, height + 1)
+    buffer = max(width, height) * 0.2
+    ax.set_xlim(-buffer, width + buffer)
+    ax.set_ylim(-buffer, height + buffer)
     ax.set_aspect('equal')
     ax.grid(True, linestyle='--', alpha=0.7)
-    ax.set_title(f"Rectangle Visualization ({width} cm × {height} cm)", pad=15)
+    ax.set_title(title, pad=15)
     ax.set_xlabel("Centimeters (cm)", labelpad=10)
     ax.set_ylabel("Centimeters (cm)", labelpad=10)
     

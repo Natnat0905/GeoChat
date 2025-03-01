@@ -48,14 +48,16 @@ def clean_math_text(response: str) -> str:
         response = re.sub(pattern, repl, response)
     return response.replace("\\", "").strip()
 
+# Update the system prompt to handle squares
 def get_gpt_response(user_message: str) -> dict:
     """Get structured response from GPT-3.5"""
     system_prompt = """You are a math assistant. Follow these rules:
 1. Solve problems from arithmetic to calculus
 2. Use standard math symbols (², √, ×, π)
-3. For visual shapes, return JSON format:
-{"shape": "circle", "parameters": {"radius": 5}, "explanation": "..."}
-4. Otherwise return plain text"""
+3. For visual shapes:
+   - Squares should use {"shape": "rectangle", "parameters": {"width": X, "height": X}}
+   - Other shapes use their specific format
+4. Return JSON for visualizations, plain text otherwise"""
     
     try:
         response = openai.ChatCompletion.create(
@@ -108,6 +110,7 @@ async def chat_handler(message: Message):
             status_code=500
         )
 
+# Update the visualization handler
 def handle_visualization(data: dict) -> Response:
     """Generate and return visualization response"""
     shape_type = data["shape"].lower()
@@ -118,11 +121,10 @@ def handle_visualization(data: dict) -> Response:
         match shape_type:
             case "circle":
                 image = draw_circle(params.get("radius", 5))
-            case "rectangle":
-                image = draw_rectangle(
-                    params.get("width", 5),
-                    params.get("height", 5)
-                )
+            case "rectangle" | "square":  # Handle squares as special rectangles
+                width = params.get("width", params.get("side", 5))
+                height = params.get("height", width)  # Use width if height missing
+                image = draw_rectangle(width, height)
             case "right-angled triangle" | "right triangle":
                 image = draw_right_triangle(
                     params.get("leg1", 0),
