@@ -148,115 +148,82 @@ async def root():
     return {"message": "Welcome to the Geometry Tutor API for Grades 7–10!"}
 
 # Chatbot interaction endpoint
+# Updated Chatbot Interaction Endpoint
 @app.post("/chat")
 async def chat_with_bot(message: Message):
     """
     Chat endpoint to process user requests and create visualizations.
-    Handles both structured GPT responses for visualization and plain-text explanations.
+    Now ensures that if an image is generated, an explanation is also returned.
     """
     try:
         user_message = message.user_message
         logging.info(f"Received message: {user_message}")
 
-        # Step 1: Use GPT to process the message (GPT decides if it's math-related)
+        # Step 1: Use GPT to process the message
         gpt_response = get_gpt_response_with_retry(user_message)
         logging.info(f"GPT Response: {gpt_response}")
-
-         # Step 2: If GPT responds with the non-math response, return it
-        if isinstance(gpt_response, dict) and "response" in gpt_response and gpt_response["response"] == "I can only assist with geometry-related questions for grades 7 to 10. Please ask a geometry question.":
-            return PlainTextResponse(content=gpt_response["response"], status_code=200)
-
+        
         text_response = gpt_response.get("response", "I couldn't process your request.")
-
-        # Step 3: Check if "illustrate" is explicitly mentioned in the message
+        illustration_path = None
+        
+        # Step 2: Check if user explicitly asks for visualization
         if any(keyword in user_message.lower() for keyword in ["illustrate", "show", "visualize", "plot", "draw"]):
-            # Extract numeric parameters manually
             parameters = extract_numeric_parameters(user_message)
-
-            # Handle manual visualization requests
-            if "circle" in user_message:
-                radius = parameters.get("radius", parameters.get("diameter", 10) / 2)
-                filepath = draw_circle(radius)
-                return FileResponse(filepath, media_type="image/png")
             
-            # Handle right triangle visualization
-            if "right triangle" in user_message:
-                leg_a = parameters.get("leg_a", 3)  # Default leg_a = 3
-                leg_b = parameters.get("leg_b", 4)  # Default leg_b = 4
-                filepath = draw_right_triangle(leg_a, leg_b)
-                return FileResponse(filepath, media_type="image/png")
-    
-            # Handle generic triangle visualization
-            if "triangle" in user_message:
+            # Handle different shape requests
+            if "circle" in user_message:
+                radius = parameters.get("radius", 5)
+                illustration_path = draw_circle(radius)
+                
+            elif "right triangle" in user_message:
+                leg_a = parameters.get("leg_a", 3)
+                leg_b = parameters.get("leg_b", 4)
+                illustration_path = draw_right_triangle(leg_a, leg_b)
+                
+            elif "triangle" in user_message:
                 side_a = parameters.get("side_a", 5)
                 side_b = parameters.get("side_b", 10)
                 side_c = parameters.get("side_c", 7)
-                try:
-                    filepath = draw_generic_triangle(side_a, side_b, side_c)
-                    return FileResponse(filepath, media_type="image/png")
-                except ValueError as e:
-                    logging.error(str(e))
-                    return JSONResponse(content={"response": str(e)}, status_code=400)
+                illustration_path = draw_generic_triangle(side_a, side_b, side_c)
                 
-            if "rectangle" in user_message:
+            elif "rectangle" in user_message:
                 width = parameters.get("width", 5)
                 height = parameters.get("height", 3)
-                filepath = draw_rectangle(width, height)
-                return FileResponse(filepath, media_type="image/png")
-
-            if "sin" in user_message or "cos" in user_message or "tan" in user_message:
-                if "sin" in user_message:
-                    filepath = plot_trigonometric_function("sin")
-                elif "cos" in user_message:
-                    filepath = plot_trigonometric_function("cos")
-                elif "tan" in user_message:
-                    filepath = plot_trigonometric_function("tan")
-                return FileResponse(filepath, media_type="image/png")
-
-            return PlainTextResponse(content="Sorry, I couldn't create an illustration for that request.", status_code=400)
-
-        # Step 4: Handle structured GPT response if "illustrate" is not mentioned
+                illustration_path = draw_rectangle(width, height)
+                
+            elif any(trig in user_message for trig in ["sin", "cos", "tan"]):
+                function = "sin" if "sin" in user_message else "cos" if "cos" in user_message else "tan"
+                illustration_path = plot_trigonometric_function(function)
+                
+            if illustration_path:
+                return JSONResponse(content={
+                    "response": text_response,  # Ensure explanation is included
+                    "illustration": illustration_path
+                })
+            
+        # Step 3: If GPT provided a shape in JSON response
         if isinstance(gpt_response, dict) and "shape" in gpt_response:
             shape = gpt_response["shape"]
             params = gpt_response["parameters"]
 
-            # Handle GPT-generated visualizations
             if shape == "circle":
-                radius = params.get("radius", 5)  # Default radius is 5
-                filepath = draw_circle(radius)
-                return FileResponse(filepath, media_type="image/png")
-
-            if shape == "triangle" and params.get("type") == "right":
-                leg_a = params.get("leg_a")
-                leg_b = params.get("leg_b")
-
-                if leg_a is None or leg_b is None:
-                    return PlainTextResponse(content="Missing parameters for right triangle visualization.", status_code=400)
-
-                filepath = draw_right_triangle(leg_a, leg_b)
-                return FileResponse(filepath, media_type="image/png")
-
+                illustration_path = draw_circle(params.get("radius", 5))
+            elif shape == "triangle" and params.get("type") == "right":
+                illustration_path = draw_right_triangle(params.get("leg_a"), params.get("leg_b"))
             elif shape == "rectangle":
-                width = params.get("width", 5)
-                height = params.get("height", 3)
-                filepath = draw_rectangle(width, height)
-                return FileResponse(filepath, media_type="image/png")
-
+                illustration_path = draw_rectangle(params.get("width", 5), params.get("height", 3))
             elif shape == "trigonometric":
-                function = params.get("function", "sin")  # Default to sin
-                filepath = plot_trigonometric_function(function)
-                return FileResponse(filepath, media_type="image/png")
-
-            return PlainTextResponse(content="Sorry, I couldn't create an illustration for that request.", status_code=400)
-
-        # Step 5: Handle plain-text GPT
-        response_data = {"response": text_response}
-
-        if filepath:
-            response_data["illustration"] = filepath
-
-        return JSONResponse(content=response_data)
-
+                illustration_path = plot_trigonometric_function(params.get("function", "sin"))
+            
+            if illustration_path:
+                return JSONResponse(content={
+                    "response": text_response,  # Include the explanation
+                    "illustration": illustration_path
+                })
+        
+        # Step 4: If no image is generated, return text response only
+        return JSONResponse(content={"response": text_response})
+    
     except Exception as e:
         logging.error(f"Error occurred: {e}")
         return PlainTextResponse(content="An error occurred. Please try again later.", status_code=500)
