@@ -4,8 +4,8 @@ import math
 import base64
 import io
 
-def draw_rectangle(width: float, height: float) -> str:
-    """Generate rectangle/square visualization with educational annotations"""
+def draw_rectangle(width: float, height: float, title: str = None) -> str:
+    """Generate rectangle visualization with optional title."""
     fig, ax = plt.subplots(figsize=(7, 6))
     
     # Create rectangle
@@ -15,17 +15,22 @@ def draw_rectangle(width: float, height: float) -> str:
     # Add measurements
     ax.text(width/2, -0.1*height, f'Width: {width} cm', ha='center', va='top', color='#2ca02c')
     ax.text(-0.1*width, height/2, f'Height: {height} cm', ha='right', va='center', rotation=90, color='#2ca02c')
-    
+
     # Add area calculation
     ax.text(width/2, height/2, f'Area = {width} × {height}\n= {width*height} cm²', 
            ha='center', va='center', bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
-    
+
+    # Set title
+    if title:
+        ax.set_title(title, pad=15)
+    else:
+        ax.set_title(f"Rectangle Visualization ({width} cm × {height} cm)", pad=15)
+
     # Configure plot
     ax.set_xlim(-1, width + 1)
     ax.set_ylim(-1, height + 1)
     ax.set_aspect('equal')
     ax.grid(True, linestyle='--', alpha=0.7)
-    ax.set_title(f"Rectangle Visualization ({width} cm × {height} cm)", pad=15)
     ax.set_xlabel("Centimeters (cm)", labelpad=10)
     ax.set_ylabel("Centimeters (cm)", labelpad=10)
     

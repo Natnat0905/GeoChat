@@ -201,7 +201,7 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
 
 def handle_visualization(data: dict) -> JSONResponse:
     try:
-        # Sanitize and extract input data
+        # Extract and normalize input data
         shape = data["shape"].lower().replace(" ", "_")
         explanation = data.get("explanation", "")
         raw_params = data.get("parameters", {})
@@ -225,31 +225,25 @@ def handle_visualization(data: dict) -> JSONResponse:
             "trigonometric": (plot_trigonometric_function, ["function"])
         }
 
-        # Check if the shape is valid and fetch corresponding function and parameters
+        # Check if the shape is valid
         if shape not in visualization_mapping:
-            return JSONResponse(
-                content={"type": "error", "content": f"Unsupported shape '{shape}'."},
-                status_code=400
-            )
+            return JSONResponse(content={"type": "error", "content": f"Unsupported shape '{shape}'."}, status_code=400)
 
         viz_func, expected_params = visualization_mapping[shape]
         args = [clean_params.get(p) for p in expected_params]
 
-        # Handle missing or invalid parameters
         if None in args:
-            return JSONResponse(
-                content={"type": "error", "content": "Missing required parameters for drawing."},
-                status_code=400
-            )
+            return JSONResponse(content={"type": "error", "content": "Missing required parameters for drawing."}, status_code=400)
 
-        # Special case for rectangles that are actually squares
+        # Special case: Label square images properly
         if shape == "rectangle" and abs(clean_params.get("width", 0) - clean_params.get("height", 0)) < 0.001:
             explanation = explanation.replace("rectangle", "square")
             explanation += f"\nNote: This is a square with side length {clean_params.get('width', 0):.2f}."
-            return draw_rectangle(clean_params["width"], clean_params["height"], explanation)
+            title = f"Square Visualization (Side: {clean_params['width']} cm)"
+            return draw_rectangle(clean_params["width"], clean_params["height"], title)
 
-        # Call the drawing function and return the image in base64 format
-        img_base64 = viz_func(*args)
+        # Call the drawing function with the correct title
+        img_base64 = viz_func(*args, explanation) if shape == "rectangle" else viz_func(*args)
         clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
 
         return JSONResponse(content={
