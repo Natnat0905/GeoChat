@@ -154,18 +154,27 @@ def get_tutor_response(user_message: str) -> dict:
 async def tutor_endpoint(message: Message):
     try:
         user_input = message.user_message
-        logging.info(f"Tutoring: {user_input}")
-        
+        logging.info(f"Tutoring request: {user_input}")
+
         response = get_tutor_response(user_input)
-        
+
+        # Check if the user explicitly asked for an illustration
+        should_draw = any(keyword in user_input.lower() for keyword in ["draw", "illustrate", "sketch", "visualize"])
+
         if "shape" in response:
-            return handle_visualization(response)
-        else:
-            return JSONResponse(content={
-                "type": "text",
-                "content": response.get("response", "Let's work through this step by step...")
-            })
-            
+            if should_draw:
+                return handle_visualization(response)  # Provide a drawing
+            else:
+                return JSONResponse(content={
+                    "type": "text",
+                    "content": response.get("explanation", "Let's work through this step by step...")
+                })
+
+        return JSONResponse(content={
+            "type": "text",
+            "content": response.get("response", "Let's work through this step by step...")
+        })
+
     except Exception as e:
         logging.error(f"Endpoint error: {str(e)}")
         return JSONResponse(
