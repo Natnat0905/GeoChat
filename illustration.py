@@ -3,6 +3,7 @@ import numpy as np
 import io
 import math
 from typing import Tuple
+import base64  # Added missing import
 
 def generate_image(fig) -> str:
     """Convert matplotlib figure to base64 encoded PNG"""
@@ -10,7 +11,7 @@ def generate_image(fig) -> str:
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     buf.seek(0)
     plt.close(fig)
-    return base64.b64encode(buf.read()).decode('utf-8')
+    return "data:image/png;base64," + base64.b64encode(buf.read()).decode('utf-8')  # Add data URI prefix
 
 def draw_circle(radius: float) -> str:
     """Generate circle visualization with educational annotations"""

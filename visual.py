@@ -3,8 +3,9 @@ import os
 import re
 import json
 import logging
+import math
 import base64
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,11 +16,9 @@ from illustration import (
     plot_trigonometric_function
 )
 
-# Initialize FastAPI app
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
-# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,46 +26,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Set OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Pydantic model for user input
 class Message(BaseModel):
     user_message: str
 
-# Enhanced tutoring prompt
-TUTOR_PROMPT = """You are an expert mathematics educator for secondary students. For every response:
-1. Break solutions into numbered, atomic steps
-2. Explain underlying principles/formulas with **bold terms**
-3. Include real-world applications (e.g., "This helps architects calculate...")
-4. Highlight common errors using ❌ symbol
-5. Provide memory aids/mnemonics where applicable
-6. Use analogies suitable for teenagers
-7. For visual questions, follow this template:
+TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-related questions:
+
+1. **Always provide both explanation AND visualization**
+2. Use this exact JSON format:
 {
   "shape": "shape_type",
-  "parameters": {...},
-  "explanation": "### Geometric Analysis\\n**Step 1:**...\\n**Formula:**...\\n📐 Visualization shows..."
-}"""
+  "parameters": {
+    "param1": numerical_value,
+    "param2": numerical_value
+  },
+  "explanation": "### Solution Steps\\n**Step 1:** Calculate parameters...\\n**Visual Concept:** Explanation..."
+}
+
+**Critical Requirements:**
+- Parameters must be calculated NUMERICAL VALUES (NOT expressions)
+- Supported shapes: circle, rectangle, right_triangle, trigonometric
+- Example: For "radius = 5/(2π)", calculate 5/(2*3.1416) = 0.7958
+- Include units in explanation but NOT in parameters
+- Always explain both calculations AND visual representation
+"""
 
 def enhance_explanation(response: str) -> str:
-    """Convert LaTeX math to plain text symbols and add tutoring enhancements"""
     replacements = {
         r"\\\(": "", r"\\\)": "",
         r"\^2": "²", r"\^3": "³",
         r"\sqrt": "√", r"\\times": "×",
-        r"\\div": "÷", r"\\frac{(\d+)}{(\d+)}": r"\1/\2",
-        r"\\rightarrow": "→", r"\\approx": "≈", r"\\pi": "π",
-        r"\*": "•"  # Convert asterisks to bullet points
+        r"\\div": "÷", r"\\frac{(\d+)}{(\d+)}": r"\1/\2"
     }
     for pattern, repl in replacements.items():
         response = re.sub(pattern, repl, response)
-    # Add step numbering validation
-    response = re.sub(r"(\d+\.)\s+", r"\n**Step \1** ", response)
     return response
 
+def safe_eval_parameter(value: str) -> float:
+    """Safely evaluate mathematical expressions with π support"""
+    try:
+        # Replace π with math.pi and handle exponents
+        expr = value.lower().replace('π', 'math.pi').replace('^', '**')
+        return eval(expr, {"__builtins__": None}, {"math": math})
+    except:
+        logging.error(f"Parameter evaluation failed: {value}")
+        return 5.0  # Return default safe value
+
 def get_tutor_response(user_message: str) -> dict:
-    """Get structured response from GPT-3.5 with tutoring enhancements"""
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -96,7 +103,6 @@ def get_tutor_response(user_message: str) -> dict:
 
 @app.post("/chat")
 async def tutor_endpoint(message: Message):
-    """Main endpoint for math problem solving with tutoring enhancements"""
     try:
         user_input = message.user_message
         logging.info(f"Tutoring: {user_input}")
@@ -104,97 +110,76 @@ async def tutor_endpoint(message: Message):
         response = get_tutor_response(user_input)
         
         if "shape" in response:
-            return add_learning_components(handle_visualization(response))
-        
-        return JSONResponse(content={
-            "type": "text",
-            "content": response.get("response", "Let's break this down step by step..."),
-            "pedagogy": generate_pedagogical_links(user_input)
-        })
-    
+            return handle_visualization(response)
+        else:
+            return JSONResponse(content={
+                "type": "text",
+                "content": response.get("response", "Let's work through this step by step...")
+            })
+            
     except Exception as e:
-        logging.error(f"Tutor Error: {e}")
+        logging.error(f"Endpoint error: {str(e)}")
         return JSONResponse(
-            content={"type": "error", "content": "Let's try another approach..."},
+            content={"type": "error", "content": "Please try rephrasing your question"},
             status_code=500
         )
 
+# visual.py - Fix parameter handling
 def handle_visualization(data: dict) -> JSONResponse:
-    """Generate and return visualization response with tutoring enhancements"""
     try:
-        shape = data["shape"].lower()
-        params = data.get("parameters", {})
+        shape = data["shape"].lower().replace(" ", "_")
         explanation = data.get("explanation", "")
+        params = data.get("parameters", {})
         
-        img_func = {
-            "circle": lambda: draw_circle(params.get("radius", 5)),
+        # Process parameters with safe evaluation
+        evaluated_params = {}
+        for key, value in params.items():
+            if isinstance(value, str):
+                evaluated_params[key] = safe_eval_parameter(value)
+            else:
+                try:
+                    evaluated_params[key] = float(value)
+                except:
+                    evaluated_params[key] = 5.0
+
+        # Map to visualization functions with correct parameter names
+        visualization_functions = {
+            "circle": lambda: draw_circle(evaluated_params.get("radius", 5)),
             "rectangle": lambda: draw_rectangle(
-                params.get("width", 5),
-                params.get("height", params.get("width", 5))
+                evaluated_params.get("width", 5),
+                evaluated_params.get("height", 5)
             ),
-            "right-angled triangle": lambda: draw_right_triangle(
-                params.get("leg1", 0),
-                params.get("leg2", 0)
+            "right_triangle": lambda: draw_right_triangle(
+                evaluated_params.get("leg1", 5),  # Changed from 'base'
+                evaluated_params.get("leg2", 5)   # Changed from 'height'
             ),
             "trigonometric": lambda: plot_trigonometric_function(
-                params.get("function", "sin")
+                evaluated_params.get("function", "sin")
             )
-        }.get(shape, lambda: None)
-        
-        if not img_func:
+        }
+
+        if shape not in visualization_functions:
             return JSONResponse(
-                content={"type": "error", "content": "Unsupported visual concept"},
+                content={"type": "error", "content": "Unsupported shape type"},
                 status_code=400
             )
-            
-        img_base64 = img_func()
-        
+
+        img_base64 = visualization_functions[shape]()
+        clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
+
         return JSONResponse(content={
             "type": "visual",
             "explanation": explanation,
-            "image": img_base64,
-            "shape": shape
+            "image": clean_base64,
+            "parameters": evaluated_params
         })
         
     except Exception as e:
-        logging.error(f"Visual Tutor Error: {e}")
+        logging.error(f"Visualization failed: {str(e)}")
         return JSONResponse(
-            content={"type": "error", "content": explanation + "\n(Visual aid unavailable)"},
+            content={"type": "error", "content": "Failed to generate visualization"},
             status_code=500
         )
-
-def add_learning_components(response: JSONResponse) -> JSONResponse:
-    """Enrich visual responses with learning materials"""
-    content = response.body.decode()
-    data = json.loads(content)
-    
-    # Add related learning resources based on shape
-    learning_components = {
-        "circle": ["Circumference Formula", "Area Applications"],
-        "rectangle": ["Surface Area", "Tiling Problems"],
-        "triangle": ["Pythagorean Theorem", "Trigonometric Ratios"]
-    }
-    
-    data["learning_resources"] = learning_components.get(
-        data.get("shape", ""), 
-        ["Basic Geometry Concepts"]
-    )
-    
-    return JSONResponse(content=data)
-
-def generate_pedagogical_links(query: str) -> dict:
-    """Generate contextual learning aids"""
-    return {
-        "related_concepts": ["Geometric Properties", "Measurement Units"],
-        "practice_problems": [
-            f"Calculate the area of a {query.split()[1]} with given dimensions",
-            f"Find the perimeter of a {query.split()[1]}"
-        ],
-        "video_resources": [
-            f"https://example.com/videos/{query.split()[1]}",
-            "https://example.com/geometry-basics"
-        ]
-    }
 
 @app.get("/health")
 async def health_check():
