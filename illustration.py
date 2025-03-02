@@ -145,3 +145,45 @@ def plot_trigonometric_function(function: str) -> str:
     ax.legend()
     
     return generate_image(fig)
+
+def draw_equilateral_triangle(side: float) -> str:
+    """Draw an equilateral triangle with a given side length."""
+    height = (math.sqrt(3) / 2) * side
+    fig, ax = plt.subplots()
+    
+    # Triangle vertices
+    vertices = np.array([
+        [0, 0], [side, 0], [side/2, height], [0, 0]
+    ])
+    
+    ax.plot(vertices[:, 0], vertices[:, 1], 'o-', color='blue', linewidth=2.5)
+    ax.set_title(f"Equilateral Triangle (Side: {side} cm)")
+    
+    return generate_image(fig)
+
+def draw_isosceles_triangle(base: float, equal_side: float) -> str:
+    """Draw an isosceles triangle with a base and two equal sides."""
+    height = math.sqrt(equal_side**2 - (base/2)**2)
+    fig, ax = plt.subplots()
+    
+    vertices = np.array([
+        [0, 0], [base, 0], [base/2, height], [0, 0]
+    ])
+    
+    ax.plot(vertices[:, 0], vertices[:, 1], 'o-', color='green', linewidth=2.5)
+    ax.set_title(f"Isosceles Triangle (Base: {base} cm, Side: {equal_side} cm)")
+    
+    return generate_image(fig)
+
+def draw_scalene_triangle(side1: float, side2: float, side3: float) -> str:
+    """Draw a scalene triangle given three side lengths."""
+    fig, ax = plt.subplots()
+    
+    vertices = np.array([
+        [0, 0], [side1, 0], [side1 / 2, side2], [0, 0]
+    ])
+    
+    ax.plot(vertices[:, 0], vertices[:, 1], 'o-', color='red', linewidth=2.5)
+    ax.set_title(f"Scalene Triangle (Sides: {side1}, {side2}, {side3} cm)")
+    
+    return generate_image(fig)
