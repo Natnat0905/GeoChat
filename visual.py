@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, Tuple
+from circle import draw_circle, calculate_circumference, calculate_diameter, calculate_area
 from illustration import (
     draw_circle,
     draw_right_triangle,
@@ -169,29 +170,20 @@ async def tutor_endpoint(message: Message):
 
         response = get_tutor_response(user_input)
 
-        # Check if the user explicitly asked for an illustration
         should_draw = any(keyword in user_input.lower() for keyword in ["draw", "illustrate", "sketch", "visualize"])
 
         if "shape" in response:
             if should_draw:
-                return handle_visualization(response)  # Provide a drawing
+                return handle_visualization(response)
             else:
-                return JSONResponse(content={
-                    "type": "text",
-                    "content": response.get("explanation", "Let's work through this step by step...")
-                })
+                return JSONResponse(content={"type": "text", "content": response.get("explanation", "Let's work through this step by step...")})
 
-        return JSONResponse(content={
-            "type": "text",
-            "content": response.get("response", "Let's work through this step by step...")
-        })
+        return JSONResponse(content={"type": "text", "content": response.get("response", "Let's work through this step by step...")})
 
     except Exception as e:
         logging.error(f"Endpoint error: {str(e)}")
-        return JSONResponse(
-            content={"type": "error", "content": "Please try rephrasing your question"},
-            status_code=500
-        )
+        return JSONResponse(content={"type": "error", "content": "Please try rephrasing your question"}, status_code=500)
+
     
 def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, float]:
     """Normalize parameters to required values using defined rules"""
@@ -232,36 +224,21 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
 
 def handle_visualization(data: dict) -> JSONResponse:
     try:
+        # Sanitize and extract input data
         shape = data["shape"].lower().replace(" ", "_")
         explanation = data.get("explanation", "")
         raw_params = data.get("parameters", {})
 
-        # ✅ Now this line works correctly without crashing
+        # Safely evaluate parameters
         evaluated_params = {key: safe_eval_parameter(value) for key, value in raw_params.items()}
 
-        # Normalize parameters
         try:
             clean_params = normalize_parameters(shape, evaluated_params)
         except ValueError as e:
-            return JSONResponse(
-                content={"type": "error", "content": str(e)},
-                status_code=400
-            )
+            return JSONResponse(content={"type": "error", "content": str(e)}, status_code=400)
 
-        # Ensure parameters exist before drawing
         if not clean_params:
-            return JSONResponse(
-                content={"type": "error", "content": "Invalid or missing parameters for visualization."},
-                status_code=400
-            )
-
-        # ✅ Square Detection: Convert rectangle to square if width == height
-        if shape == "rectangle":
-            width = clean_params.get("width", 0)
-            height = clean_params.get("height", 0)
-            if abs(width - height) < 0.001:
-                explanation = explanation.replace("rectangle", "square")
-                explanation += f"\nNote: This is a square with side length {width:.2f} cm"
+            return JSONResponse(content={"type": "error", "content": "Invalid or missing parameters for visualization."}, status_code=400)
 
         # Unified visualization mapping
         visualization_mapping = {
@@ -271,6 +248,7 @@ def handle_visualization(data: dict) -> JSONResponse:
             "trigonometric": (plot_trigonometric_function, ["function"])
         }
 
+        # Check if the shape is valid and fetch corresponding function and parameters
         if shape not in visualization_mapping:
             return JSONResponse(
                 content={"type": "error", "content": f"Unsupported shape '{shape}'."},
@@ -280,13 +258,20 @@ def handle_visualization(data: dict) -> JSONResponse:
         viz_func, expected_params = visualization_mapping[shape]
         args = [clean_params.get(p) for p in expected_params]
 
-        # Ensure all required params exist
+        # Handle missing or invalid parameters
         if None in args:
             return JSONResponse(
                 content={"type": "error", "content": "Missing required parameters for drawing."},
                 status_code=400
             )
 
+        # Special case for rectangles that are actually squares
+        if shape == "rectangle" and abs(clean_params.get("width", 0) - clean_params.get("height", 0)) < 0.001:
+            explanation = explanation.replace("rectangle", "square")
+            explanation += f"\nNote: This is a square with side length {clean_params.get('width', 0):.2f}."
+            return draw_rectangle(clean_params["width"], clean_params["height"], explanation)
+
+        # Call the drawing function and return the image in base64 format
         img_base64 = viz_func(*args)
         clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
 
@@ -298,11 +283,8 @@ def handle_visualization(data: dict) -> JSONResponse:
         })
 
     except Exception as e:
-        logging.error(f"Visualization failed: {str(e)}")
-        return JSONResponse(
-            content={"type": "error", "content": "Visualization generation failed"},
-            status_code=500
-        )
+        logging.error(f"Visualization Error: {e}")
+        return JSONResponse(content={"type": "error", "content": "Error in visualization generation."}, status_code=500)
 
 @app.get("/health")
 async def health_check():

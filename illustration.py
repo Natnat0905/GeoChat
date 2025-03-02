@@ -13,36 +13,6 @@ def generate_image(fig) -> str:
     plt.close(fig)
     return "data:image/png;base64," + base64.b64encode(buf.read()).decode('utf-8')  # Add data URI prefix
 
-def draw_circle(radius: float) -> str:
-    """Generate circle visualization with educational annotations"""
-    fig, ax = plt.subplots(figsize=(6, 6))
-    
-    # Create circle
-    circle = plt.Circle((0, 0), radius, fill=False, color='#1f77b4', linewidth=2.5)
-    ax.add_artist(circle)
-    
-    # Add radius annotation
-    ax.annotate(f'r = {radius} cm', xy=(0, 0), xytext=(0, radius/2),
-               arrowprops=dict(arrowstyle="->", color='#2ca02c'),
-               ha='center', fontsize=10)
-    
-    # Add practical applications
-    ax.text(radius*1.1, 0, 
-           "Practical Measurements:\n"
-           f"- Wheel rotation: {radius*2*math.pi:.1f}cm/rev\n"
-           f"- Pizza area: {math.pi*radius**2:.1f}cm²",
-           fontsize=9)
-    
-    # Configure plot
-    ax.set_xlim(-radius*1.2, radius*1.2)
-    ax.set_ylim(-radius*1.2, radius*1.2)
-    ax.set_aspect('equal')
-    ax.grid(True, linestyle='--', alpha=0.7)
-    ax.set_title(f"Circle Visualization (Radius: {radius} cm)", pad=20)
-    ax.set_xlabel("Centimeters (cm)", labelpad=10)
-    ax.set_ylabel("Centimeters (cm)", labelpad=10)
-    
-    return generate_image(fig)
 
 def draw_right_triangle(leg1: float, leg2: float) -> str:
     """Generate right-angled triangle with educational annotations"""
