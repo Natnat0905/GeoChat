@@ -34,23 +34,24 @@ class Message(BaseModel):
 
 TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-related questions:
 
-1. **Always provide both explanation AND visualization**
-2. Use this exact JSON format:
+**Key Requirements:**
+1. Provide BOTH explanation AND visualization
+2. Use EXACT JSON format:
 {
   "shape": "shape_type",
-  "parameters": {
-    "param1": numerical_value,
-    "param2": numerical_value
-  },
-  "explanation": "### Solution Steps\\n**Step 1:** Calculate parameters...\\n**Visual Concept:** Explanation..."
+  "parameters": {"param1": value, ...}, 
+  "explanation": "Steps..."
 }
 
-**Critical Requirements:**
-- Parameters must be calculated NUMERICAL VALUES (NOT expressions)
+**Critical Rules:**
+- Parameters must be NUMERICAL VALUES (no expressions)
 - Supported shapes: circle, rectangle, right_triangle, trigonometric
-- Example: For "radius = 5/(2π)", calculate 5/(2*3.1416) = 0.7958
-- Include units in explanation but NOT in parameters
-- Always explain both calculations AND visual representation
+- For rectangles/squares:
+  - Use width/height pair OR area with one dimension
+  - For squares, use "side" parameter
+- Example square: {"shape":"rectangle", "parameters":{"side":5}}
+- Example rectangle: {"shape":"rectangle", "parameters":{"area":20, "height":4}}
+- Always include units in explanation but NOT in parameters
 """
 
 # Add after TUTOR_PROMPT
@@ -68,10 +69,12 @@ SHAPE_NORMALIZATION_RULES = {
         "required": ["width", "height"],
         "derived": {
             "width": [
-                {"source": ["area", "height"], "formula": lambda a,h: a/h}
+                {"source": ["area", "height"], "formula": lambda a,h: a/h},
+                {"source": ["side"], "formula": lambda s: s}  # For squares
             ],
             "height": [
-                {"source": ["area", "width"], "formula": lambda a,w: a/w}
+                {"source": ["area", "width"], "formula": lambda a,w: a/w},
+                {"source": ["side"], "formula": lambda s: s}  # For squares
             ]
         }
     },
@@ -108,6 +111,10 @@ def enhance_explanation(response: str) -> str:
 def safe_eval_parameter(value: str) -> float:
     """Safely evaluate mathematical expressions with π support"""
     try:
+         # Add support for 'side' parameter
+        if 'side' in value.lower():
+            return safe_eval_parameter(value.lower().replace('side', ''))
+        
         # Replace π with math.pi and handle exponents
         expr = value.lower().replace('π', 'math.pi').replace('^', '**')
         return eval(expr, {"__builtins__": None}, {"math": math})
@@ -173,36 +180,33 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
     derived = rules.get("derived", {})
     
     normalized = params.copy()
-    attempts = 3  # Prevent infinite loops
     
+    # Handle square special case first
+    if shape == "rectangle" and "side" in normalized:
+        normalized["width"] = normalized["side"]
+        normalized["height"] = normalized["side"]
+    
+    attempts = 3  # Prevent infinite loops
     while attempts > 0:
         missing = [p for p in required if p not in normalized]
-        if not missing:
-            break
-            
+        if not missing: break
+        
         for param in missing:
-            formulas = derived.get(param, [])
-            for formula in formulas:
-                sources = formula["source"]
-                if all(s in normalized for s in sources):
+            for formula in derived.get(param, []):
+                if all(s in normalized for s in formula["source"]):
                     try:
                         normalized[param] = formula["formula"](
-                            *[normalized[s] for s in sources]
+                            *[normalized[s] for s in formula["source"]]
                         )
                         break
                     except Exception as e:
-                        logging.warning(f"Formula failed for {param}: {e}")
+                        logging.warning(f"Formula failed: {param} from {formula['source']}")
         attempts -= 1
     
-    # Validate final parameters
+    # Final validation
     for p in required:
-        if p not in normalized:
-            raise ValueError(f"Missing required parameter: {p}")
-        try:
-            normalized[p] = float(normalized[p])
-        except:
-            raise ValueError(f"Invalid value for {p}: {normalized[p]}")
-    
+        if p not in normalized or not isinstance(normalized[p], (int, float)):
+            raise ValueError(f"Missing/invalid parameter: {p}")
     return normalized
 
 def handle_visualization(data: dict) -> JSONResponse:
@@ -233,6 +237,14 @@ def handle_visualization(data: dict) -> JSONResponse:
                 status_code=400
             )
         
+        # Square detection and explanation update
+        if shape == "rectangle":
+            width = clean_params.get("width", 0)
+            height = clean_params.get("height", 0)
+            if abs(width - height) < 0.001:
+                explanation = explanation.replace("rectangle", "square")
+                explanation += f"\nNote: This is a square with side length {width:.2f} cm"
+
         # Unified visualization mapping
         visualization_mapping = {
             "circle": (draw_circle, ["radius"]),
