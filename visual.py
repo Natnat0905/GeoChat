@@ -112,19 +112,24 @@ def enhance_explanation(response: str) -> str:
         response = re.sub(pattern, repl, response)
     return response
 
-def safe_eval_parameter(value: str) -> Optional[float]:
-    """Safely evaluate mathematical expressions with π support"""
+def safe_eval_parameter(value: Any) -> Optional[float]:
+    """Safely evaluate mathematical expressions with π support, handling both strings and numbers."""
     try:
-        if not value or value.strip() == "":
-            return None  # Return None instead of an invalid default value
-        
+        # If the value is already a number (int or float), return it directly
+        if isinstance(value, (int, float)):
+            return float(value)
+
+        # Ensure value is a string before calling .strip()
+        if not isinstance(value, str) or value.strip() == "":
+            return None  # Return None for invalid values
+
         # Replace π with math.pi and handle exponents
         expr = value.lower().replace('π', 'math.pi').replace('^', '**')
         return eval(expr, {"__builtins__": None}, {"math": math})
-    
+
     except Exception as e:
         logging.error(f"Parameter evaluation failed: {value} -> {e}")
-        return None  # Return None instead of a default number
+        return None  # Return None for invalid cases
 
 def get_tutor_response(user_message: str) -> dict:
     try:
@@ -229,7 +234,7 @@ def handle_visualization(data: dict) -> JSONResponse:
         explanation = data.get("explanation", "")
         raw_params = data.get("parameters", {})
 
-        # Evaluate all parameters first
+        # ✅ Now this line works correctly without crashing
         evaluated_params = {key: safe_eval_parameter(value) for key, value in raw_params.items()}
 
         # Normalize parameters
