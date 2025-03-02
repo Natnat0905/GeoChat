@@ -3,19 +3,6 @@ import math
 import io
 import base64
 
-# Circle-related calculations
-def calculate_circumference(radius: float) -> float:
-    """Calculate the circumference of a circle given the radius."""
-    return 2 * math.pi * radius
-
-def calculate_diameter(radius: float) -> float:
-    """Calculate the diameter of a circle given the radius."""
-    return 2 * radius
-
-def calculate_area(radius: float) -> float:
-    """Calculate the area of a circle given the radius."""
-    return math.pi * radius**2
-
 def draw_circle(radius: float) -> str:
     """Draw a circle given a radius and return the image as a base64 string."""
     fig, ax = plt.subplots()
