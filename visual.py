@@ -240,10 +240,11 @@ def handle_visualization(data: dict) -> JSONResponse:
             explanation = explanation.replace("rectangle", "square")
             explanation += f"\nNote: This is a square with side length {clean_params.get('width', 0):.2f}."
             title = f"Square Visualization (Side: {clean_params['width']} cm)"
-            return draw_rectangle(clean_params["width"], clean_params["height"], title)
+            img_base64 = draw_rectangle(clean_params["width"], clean_params["height"], title)
+        else:
+            # Call the drawing function without passing an extra title
+            img_base64 = viz_func(*args)
 
-        # Call the drawing function with the correct title
-        img_base64 = viz_func(*args, explanation) if shape == "rectangle" else viz_func(*args)
         clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
 
         return JSONResponse(content={
