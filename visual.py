@@ -19,6 +19,8 @@ from illustration import (
     draw_isosceles_triangle,
     draw_scalene_triangle
 )
+from triangle import draw_equilateral_triangle, draw_isosceles_triangle, draw_scalene_triangle
+
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -293,16 +295,12 @@ def handle_visualization(data: dict) -> JSONResponse:
 
         return JSONResponse(content={"type": "visual", "explanation": explanation, "image": img})
 
-        # Generate visualization
-        img_base64 = viz_func(*args)
-        clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
-
-        return JSONResponse(content={
-            "type": "visual",
-            "explanation": explanation,
-            "image": clean_base64,
-            "parameters": clean_params
-        })
+    except Exception as e:
+        logging.error(f"Visualization failed: {str(e)}")
+        return JSONResponse(
+            content={"type": "error", "content": "Visualization generation failed"},
+            status_code=500
+        )
 
     except Exception as e:
         logging.error(f"Visualization failed: {str(e)}")
