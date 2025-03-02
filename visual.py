@@ -65,18 +65,20 @@ SHAPE_NORMALIZATION_RULES = {
             ]
         }
     },
-    "rectangle": {
+     "rectangle": {
         "required": ["width", "height"],
         "derived": {
             "width": [
                 {"source": ["area", "height"], "formula": lambda a, h: a / h},
-                {"source": ["side"], "formula": lambda s: s},  # For squares
+                {"source": ["side"], "formula": lambda s: s},  # Square support
+                {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},  # ✅ FIXED
                 {"source": ["diagonal", "height"], "formula": lambda d, h: math.sqrt(d**2 - h**2)},
                 {"source": ["perimeter", "height"], "formula": lambda p, h: (p - 2 * h) / 2}
             ],
             "height": [
                 {"source": ["area", "width"], "formula": lambda a, w: a / w},
-                {"source": ["side"], "formula": lambda s: s},  # For squares
+                {"source": ["side"], "formula": lambda s: s},  # Square support
+                {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},  # ✅ FIXED
                 {"source": ["diagonal", "width"], "formula": lambda d, w: math.sqrt(d**2 - w**2)},
                 {"source": ["perimeter", "width"], "formula": lambda p, w: (p - 2 * w) / 2}
             ]
@@ -253,7 +255,7 @@ def handle_visualization(data: dict) -> JSONResponse:
                 status_code=400
             )
 
-        # Square detection and explanation update
+        # ✅ Square Detection: Convert rectangle to square if width == height
         if shape == "rectangle":
             width = clean_params.get("width", 0)
             height = clean_params.get("height", 0)
