@@ -14,13 +14,8 @@ from illustration import (
     draw_circle,
     draw_right_triangle,
     draw_rectangle,
-    plot_trigonometric_function,
-    draw_equilateral_triangle,
-    draw_isosceles_triangle,
-    draw_scalene_triangle
+    plot_trigonometric_function
 )
-from triangle import draw_equilateral_triangle, draw_isosceles_triangle, draw_scalene_triangle
-
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -102,26 +97,6 @@ SHAPE_NORMALIZATION_RULES = {
             ]
         }
     },
-    "triangle": {
-        "required": ["side1", "side2", "side3"],
-        "derived": {
-            # Right-angled triangle: Compute missing leg using Pythagoras
-            "side1": [
-                {"source": ["hypotenuse", "side2"], "formula": lambda h, s2: math.sqrt(h**2 - s2**2)}
-            ],
-            "side2": [
-                {"source": ["hypotenuse", "side1"], "formula": lambda h, s1: math.sqrt(h**2 - s1**2)}
-            ],
-            # Equilateral triangle: If only one side is given, assume all sides are equal
-            "side1": [{"source": ["side"], "formula": lambda s: s}],
-            "side2": [{"source": ["side"], "formula": lambda s: s}],
-            "side3": [{"source": ["side"], "formula": lambda s: s}],
-            # Isosceles triangle: Compute height using Pythagorean theorem
-            "height": [
-                {"source": ["base", "equal_side"], "formula": lambda b, e: math.sqrt(e**2 - (b/2)**2)}
-            ]
-        }
-    },
     "trigonometric": {
         "required": ["function"],
         "derived": {}
@@ -190,12 +165,9 @@ def get_tutor_response(user_message: str) -> dict:
 async def tutor_endpoint(message: Message):
     try:
         user_input = message.user_message
-        logging.info(f"Tutoring request: {user_input}")  # Log the input
+        logging.info(f"Tutoring request: {user_input}")
 
         response = get_tutor_response(user_input)
-
-        # Add debug print to check parsed shape parameters
-        logging.info(f"GPT Response: {response}")
 
         # Check if the user explicitly asked for an illustration
         should_draw = any(keyword in user_input.lower() for keyword in ["draw", "illustrate", "sketch", "visualize"])
@@ -251,13 +223,6 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
                         logging.warning(f"Formula failed for {param} from {formula['source']}: {e}")
         attempts -= 1
 
-    # Validate triangle existence
-    if shape == "triangle":
-        s1, s2, s3 = normalized.get("side1"), normalized.get("side2"), normalized.get("side3")
-        if s1 and s2 and s3:
-            if not (s1 + s2 > s3 and s1 + s3 > s2 and s2 + s3 > s1):
-                raise ValueError("Invalid triangle dimensions. The sum of any two sides must be greater than the third.")
-
     # Ensure all required parameters exist
     for p in required:
         if p not in normalized or not isinstance(normalized[p], (int, float)):
@@ -267,40 +232,70 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
 
 def handle_visualization(data: dict) -> JSONResponse:
     try:
-        shape = data["shape"].lower()
+        shape = data["shape"].lower().replace(" ", "_")
         explanation = data.get("explanation", "")
         raw_params = data.get("parameters", {})
 
-        evaluated_params = {key: float(value) for key, value in raw_params.items()}
-        clean_params = normalize_parameters(shape, evaluated_params)
+        # ✅ Now this line works correctly without crashing
+        evaluated_params = {key: safe_eval_parameter(value) for key, value in raw_params.items()}
 
+        # Normalize parameters
+        try:
+            clean_params = normalize_parameters(shape, evaluated_params)
+        except ValueError as e:
+            return JSONResponse(
+                content={"type": "error", "content": str(e)},
+                status_code=400
+            )
+
+        # Ensure parameters exist before drawing
         if not clean_params:
             return JSONResponse(
                 content={"type": "error", "content": "Invalid or missing parameters for visualization."},
                 status_code=400
             )
 
-        if shape == "triangle":
-            side1, side2, side3 = clean_params["side1"], clean_params["side2"], clean_params["side3"]
-            
-            if side1 == side2 == side3:
-                explanation += f"\nThis is an equilateral triangle with sides {side1} cm."
-                img = draw_equilateral_triangle(side1)
-            elif side1 == side2 or side1 == side3 or side2 == side3:
-                explanation += f"\nThis is an isosceles triangle with base {side1} cm and equal sides {side2} cm."
-                img = draw_isosceles_triangle(side1, side2)
-            else:
-                explanation += f"\nThis is a scalene triangle with sides {side1} cm, {side2} cm, and {side3} cm."
-                img = draw_scalene_triangle(side1, side2, side3)
+        # ✅ Square Detection: Convert rectangle to square if width == height
+        if shape == "rectangle":
+            width = clean_params.get("width", 0)
+            height = clean_params.get("height", 0)
+            if abs(width - height) < 0.001:
+                explanation = explanation.replace("rectangle", "square")
+                explanation += f"\nNote: This is a square with side length {width:.2f} cm"
 
-        return JSONResponse(content={"type": "visual", "explanation": explanation, "image": img})
+        # Unified visualization mapping
+        visualization_mapping = {
+            "circle": (draw_circle, ["radius"]),
+            "rectangle": (draw_rectangle, ["width", "height"]),
+            "right_triangle": (draw_right_triangle, ["leg1", "leg2"]),
+            "trigonometric": (plot_trigonometric_function, ["function"])
+        }
 
-    except Exception as e:
-        logging.error(f"Visualization failed: {str(e)}")
-        return JSONResponse(
-            content={"type": "error", "content": "Visualization generation failed"},
-            status_code=500
-        )
+        if shape not in visualization_mapping:
+            return JSONResponse(
+                content={"type": "error", "content": f"Unsupported shape '{shape}'."},
+                status_code=400
+            )
+
+        viz_func, expected_params = visualization_mapping[shape]
+        args = [clean_params.get(p) for p in expected_params]
+
+        # Ensure all required params exist
+        if None in args:
+            return JSONResponse(
+                content={"type": "error", "content": "Missing required parameters for drawing."},
+                status_code=400
+            )
+
+        img_base64 = viz_func(*args)
+        clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
+
+        return JSONResponse(content={
+            "type": "visual",
+            "explanation": explanation,
+            "image": clean_base64,
+            "parameters": clean_params
+        })
 
     except Exception as e:
         logging.error(f"Visualization failed: {str(e)}")
