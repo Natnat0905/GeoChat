@@ -188,9 +188,12 @@ def get_tutor_response(user_message: str) -> dict:
 async def tutor_endpoint(message: Message):
     try:
         user_input = message.user_message
-        logging.info(f"Tutoring request: {user_input}")
+        logging.info(f"Tutoring request: {user_input}")  # Log the input
 
         response = get_tutor_response(user_input)
+
+        # Add debug print to check parsed shape parameters
+        logging.info(f"GPT Response: {response}")
 
         # Check if the user explicitly asked for an illustration
         should_draw = any(keyword in user_input.lower() for keyword in ["draw", "illustrate", "sketch", "visualize"])
@@ -246,6 +249,13 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
                         logging.warning(f"Formula failed for {param} from {formula['source']}: {e}")
         attempts -= 1
 
+    # Validate triangle existence
+    if shape == "triangle":
+        s1, s2, s3 = normalized.get("side1"), normalized.get("side2"), normalized.get("side3")
+        if s1 and s2 and s3:
+            if not (s1 + s2 > s3 and s1 + s3 > s2 and s2 + s3 > s1):
+                raise ValueError("Invalid triangle dimensions. The sum of any two sides must be greater than the third.")
+
     # Ensure all required parameters exist
     for p in required:
         if p not in normalized or not isinstance(normalized[p], (int, float)):
@@ -255,63 +265,33 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
 
 def handle_visualization(data: dict) -> JSONResponse:
     try:
-        shape = data["shape"].lower().replace(" ", "_")
+        shape = data["shape"].lower()
         explanation = data.get("explanation", "")
         raw_params = data.get("parameters", {})
 
-        # ✅ Process triangle inputs safely
-        evaluated_params = {key: safe_eval_parameter(value) for key, value in raw_params.items()}
+        evaluated_params = {key: float(value) for key, value in raw_params.items()}
+        clean_params = normalize_parameters(shape, evaluated_params)
 
-        # Normalize parameters
-        try:
-            clean_params = normalize_parameters(shape, evaluated_params)
-        except ValueError as e:
-            return JSONResponse(
-                content={"type": "error", "content": str(e)},
-                status_code=400
-            )
-
-        # Ensure required parameters exist
         if not clean_params:
             return JSONResponse(
                 content={"type": "error", "content": "Invalid or missing parameters for visualization."},
                 status_code=400
             )
 
-        # ✅ Detect different types of triangles
         if shape == "triangle":
-            side1, side2, side3 = clean_params.get("side1"), clean_params.get("side2"), clean_params.get("side3")
-            height = clean_params.get("height", None)
-
-            # Equilateral triangle
+            side1, side2, side3 = clean_params["side1"], clean_params["side2"], clean_params["side3"]
+            
             if side1 == side2 == side3:
                 explanation += f"\nThis is an equilateral triangle with sides {side1} cm."
-                viz_func = draw_equilateral_triangle
-                args = [side1]
-
-            # Isosceles triangle
+                img = draw_equilateral_triangle(side1)
             elif side1 == side2 or side1 == side3 or side2 == side3:
                 explanation += f"\nThis is an isosceles triangle with base {side1} cm and equal sides {side2} cm."
-                viz_func = draw_isosceles_triangle
-                args = [side1, side2]
-
-            # Right-angled triangle
-            elif any(math.isclose(s1**2 + s2**2, s3**2, rel_tol=1e-3) for s1, s2, s3 in [(side1, side2, side3), (side1, side3, side2), (side2, side3, side1)]):
-                explanation += f"\nThis is a right-angled triangle with legs {side1} cm and {side2} cm."
-                viz_func = draw_right_triangle
-                args = [side1, side2]
-
-            # Scalene triangle
+                img = draw_isosceles_triangle(side1, side2)
             else:
                 explanation += f"\nThis is a scalene triangle with sides {side1} cm, {side2} cm, and {side3} cm."
-                viz_func = draw_scalene_triangle
-                args = [side1, side2, side3]
+                img = draw_scalene_triangle(side1, side2, side3)
 
-        else:
-            return JSONResponse(
-                content={"type": "error", "content": f"Unsupported shape '{shape}'."},
-                status_code=400
-            )
+        return JSONResponse(content={"type": "visual", "explanation": explanation, "image": img})
 
         # Generate visualization
         img_base64 = viz_func(*args)
@@ -323,13 +303,6 @@ def handle_visualization(data: dict) -> JSONResponse:
             "image": clean_base64,
             "parameters": clean_params
         })
-
-    except Exception as e:
-        logging.error(f"Visualization failed: {str(e)}")
-        return JSONResponse(
-            content={"type": "error", "content": "Visualization generation failed"},
-            status_code=500
-        )
 
     except Exception as e:
         logging.error(f"Visualization failed: {str(e)}")
