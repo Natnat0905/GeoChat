@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, Any, Optional, Tuple
 from illustration import (
     draw_circle,
     draw_right_triangle,
@@ -51,6 +52,47 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 - Include units in explanation but NOT in parameters
 - Always explain both calculations AND visual representation
 """
+
+# Add after TUTOR_PROMPT
+SHAPE_NORMALIZATION_RULES = {
+    "circle": {
+        "required": ["radius"],
+        "derived": {
+            "radius": [
+                {"source": ["diameter"], "formula": lambda d: d/2},
+                {"source": ["circumference"], "formula": lambda c: c/(2*math.pi)}
+            ]
+        }
+    },
+    "rectangle": {
+        "required": ["width", "height"],
+        "derived": {
+            "width": [
+                {"source": ["area", "height"], "formula": lambda a,h: a/h}
+            ],
+            "height": [
+                {"source": ["area", "width"], "formula": lambda a,w: a/w}
+            ]
+        }
+    },
+    "right_triangle": {
+        "required": ["leg1", "leg2"],
+        "derived": {
+            "leg1": [
+                {"source": ["hypotenuse", "leg2"], 
+                 "formula": lambda h,l2: math.sqrt(h**2 - l2**2)}
+            ],
+            "leg2": [
+                {"source": ["hypotenuse", "leg1"], 
+                 "formula": lambda h,l1: math.sqrt(h**2 - l1**2)}
+            ]
+        }
+    },
+    "trigonometric": {
+        "required": ["function"],
+        "derived": {}
+    }
+}
 
 def enhance_explanation(response: str) -> str:
     replacements = {
@@ -123,61 +165,105 @@ async def tutor_endpoint(message: Message):
             content={"type": "error", "content": "Please try rephrasing your question"},
             status_code=500
         )
+    
+def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, float]:
+    """Normalize parameters to required values using defined rules"""
+    rules = SHAPE_NORMALIZATION_RULES.get(shape, {})
+    required = rules.get("required", [])
+    derived = rules.get("derived", {})
+    
+    normalized = params.copy()
+    attempts = 3  # Prevent infinite loops
+    
+    while attempts > 0:
+        missing = [p for p in required if p not in normalized]
+        if not missing:
+            break
+            
+        for param in missing:
+            formulas = derived.get(param, [])
+            for formula in formulas:
+                sources = formula["source"]
+                if all(s in normalized for s in sources):
+                    try:
+                        normalized[param] = formula["formula"](
+                            *[normalized[s] for s in sources]
+                        )
+                        break
+                    except Exception as e:
+                        logging.warning(f"Formula failed for {param}: {e}")
+        attempts -= 1
+    
+    # Validate final parameters
+    for p in required:
+        if p not in normalized:
+            raise ValueError(f"Missing required parameter: {p}")
+        try:
+            normalized[p] = float(normalized[p])
+        except:
+            raise ValueError(f"Invalid value for {p}: {normalized[p]}")
+    
+    return normalized
 
-# visual.py - Fix parameter handling
 def handle_visualization(data: dict) -> JSONResponse:
     try:
         shape = data["shape"].lower().replace(" ", "_")
         explanation = data.get("explanation", "")
-        params = data.get("parameters", {})
+        raw_params = data.get("parameters", {})
         
-        # Process parameters with safe evaluation
+        # Evaluate all parameters first
         evaluated_params = {}
-        for key, value in params.items():
-            if isinstance(value, str):
-                evaluated_params[key] = safe_eval_parameter(value)
-            else:
-                try:
-                    evaluated_params[key] = float(value)
-                except:
-                    evaluated_params[key] = 5.0
+        for key, value in raw_params.items():
+            try:
+                evaluated_params[key] = (
+                    safe_eval_parameter(value) 
+                    if isinstance(value, str) 
+                    else float(value)
+                )  # Fixed missing closing parenthesis
+            except Exception as e:
+                logging.error(f"Invalid parameter {key}={value}: {str(e)}")
+                evaluated_params[key] = None
 
-        # Map to visualization functions with correct parameter names
-        visualization_functions = {
-            "circle": lambda: draw_circle(evaluated_params.get("radius", 5)),
-            "rectangle": lambda: draw_rectangle(
-                evaluated_params.get("width", 5),
-                evaluated_params.get("height", 5)
-            ),
-            "right_triangle": lambda: draw_right_triangle(
-                evaluated_params.get("leg1", 5),  # Changed from 'base'
-                evaluated_params.get("leg2", 5)   # Changed from 'height'
-            ),
-            "trigonometric": lambda: plot_trigonometric_function(
-                evaluated_params.get("function", "sin")
-            )
-        }
-
-        if shape not in visualization_functions:
+        # Normalize to required parameters
+        try:
+            clean_params = normalize_parameters(shape, evaluated_params)
+        except ValueError as e:
             return JSONResponse(
-                content={"type": "error", "content": "Unsupported shape type"},
+                content={"type": "error", "content": str(e)},
                 status_code=400
             )
-
-        img_base64 = visualization_functions[shape]()
+        
+        # Unified visualization mapping
+        visualization_mapping = {
+            "circle": (draw_circle, ["radius"]),
+            "rectangle": (draw_rectangle, ["width", "height"]),
+            "right_triangle": (draw_right_triangle, ["leg1", "leg2"]),
+            "trigonometric": (plot_trigonometric_function, ["function"])
+        }
+        
+        if shape not in visualization_mapping:
+            return JSONResponse(
+                content={"type": "error", "content": "Unsupported shape"},
+                status_code=400
+            )
+        
+        viz_func, expected_params = visualization_mapping[shape]
+        args = [clean_params[p] for p in expected_params]
+        
+        img_base64 = viz_func(*args)
         clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
 
         return JSONResponse(content={
             "type": "visual",
             "explanation": explanation,
             "image": clean_base64,
-            "parameters": evaluated_params
+            "parameters": clean_params
         })
         
     except Exception as e:
         logging.error(f"Visualization failed: {str(e)}")
         return JSONResponse(
-            content={"type": "error", "content": "Failed to generate visualization"},
+            content={"type": "error", "content": "Visualization generation failed"},
             status_code=500
         )
 

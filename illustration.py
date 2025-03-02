@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import io
 import math
-from typing import Tuple
+from typing import Dict, Any, Optional, Tuple
 import base64  # Added missing import
 
 def generate_image(fig) -> str:
