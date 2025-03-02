@@ -12,7 +12,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, Tuple
 from circle import draw_circle, calculate_circumference, calculate_diameter, calculate_area
 from illustration import (
-    draw_circle,
     draw_right_triangle,
     draw_rectangle,
     plot_trigonometric_function
