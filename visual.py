@@ -69,12 +69,16 @@ SHAPE_NORMALIZATION_RULES = {
         "required": ["width", "height"],
         "derived": {
             "width": [
-                {"source": ["area", "height"], "formula": lambda a,h: a/h},
-                {"source": ["side"], "formula": lambda s: s}  # For squares
+                {"source": ["area", "height"], "formula": lambda a, h: a / h},
+                {"source": ["side"], "formula": lambda s: s},  # For squares
+                {"source": ["diagonal", "height"], "formula": lambda d, h: math.sqrt(d**2 - h**2)},
+                {"source": ["perimeter", "height"], "formula": lambda p, h: (p - 2 * h) / 2}
             ],
             "height": [
-                {"source": ["area", "width"], "formula": lambda a,w: a/w},
-                {"source": ["side"], "formula": lambda s: s}  # For squares
+                {"source": ["area", "width"], "formula": lambda a, w: a / w},
+                {"source": ["side"], "formula": lambda s: s},  # For squares
+                {"source": ["diagonal", "width"], "formula": lambda d, w: math.sqrt(d**2 - w**2)},
+                {"source": ["perimeter", "width"], "formula": lambda p, w: (p - 2 * w) / 2}
             ]
         }
     },
@@ -108,19 +112,19 @@ def enhance_explanation(response: str) -> str:
         response = re.sub(pattern, repl, response)
     return response
 
-def safe_eval_parameter(value: str) -> float:
+def safe_eval_parameter(value: str) -> Optional[float]:
     """Safely evaluate mathematical expressions with π support"""
     try:
-         # Add support for 'side' parameter
-        if 'side' in value.lower():
-            return safe_eval_parameter(value.lower().replace('side', ''))
+        if not value or value.strip() == "":
+            return None  # Return None instead of an invalid default value
         
         # Replace π with math.pi and handle exponents
         expr = value.lower().replace('π', 'math.pi').replace('^', '**')
         return eval(expr, {"__builtins__": None}, {"math": math})
-    except:
-        logging.error(f"Parameter evaluation failed: {value}")
-        return 5.0  # Return default safe value
+    
+    except Exception as e:
+        logging.error(f"Parameter evaluation failed: {value} -> {e}")
+        return None  # Return None instead of a default number
 
 def get_tutor_response(user_message: str) -> dict:
     try:
@@ -187,35 +191,36 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
     rules = SHAPE_NORMALIZATION_RULES.get(shape, {})
     required = rules.get("required", [])
     derived = rules.get("derived", {})
-    
-    normalized = params.copy()
-    
-    # Handle square special case first
+
+    normalized = {k: v for k, v in params.items() if v is not None}  # Ignore None values
+
+    # Special case for squares
     if shape == "rectangle" and "side" in normalized:
         normalized["width"] = normalized["side"]
         normalized["height"] = normalized["side"]
-    
+
     attempts = 3  # Prevent infinite loops
     while attempts > 0:
         missing = [p for p in required if p not in normalized]
         if not missing: break
-        
+
         for param in missing:
             for formula in derived.get(param, []):
                 if all(s in normalized for s in formula["source"]):
                     try:
-                        normalized[param] = formula["formula"](
-                            *[normalized[s] for s in formula["source"]]
-                        )
-                        break
+                        result = formula["formula"](*[normalized[s] for s in formula["source"]])
+                        if result is not None:
+                            normalized[param] = result
+                            break
                     except Exception as e:
-                        logging.warning(f"Formula failed: {param} from {formula['source']}")
+                        logging.warning(f"Formula failed for {param} from {formula['source']}: {e}")
         attempts -= 1
-    
-    # Final validation
+
+    # Ensure all required parameters exist
     for p in required:
         if p not in normalized or not isinstance(normalized[p], (int, float)):
-            raise ValueError(f"Missing/invalid parameter: {p}")
+            raise ValueError(f"Missing or invalid parameter: {p}")
+
     return normalized
 
 def handle_visualization(data: dict) -> JSONResponse:
@@ -223,21 +228,11 @@ def handle_visualization(data: dict) -> JSONResponse:
         shape = data["shape"].lower().replace(" ", "_")
         explanation = data.get("explanation", "")
         raw_params = data.get("parameters", {})
-        
-        # Evaluate all parameters first
-        evaluated_params = {}
-        for key, value in raw_params.items():
-            try:
-                evaluated_params[key] = (
-                    safe_eval_parameter(value) 
-                    if isinstance(value, str) 
-                    else float(value)
-                )  # Fixed missing closing parenthesis
-            except Exception as e:
-                logging.error(f"Invalid parameter {key}={value}: {str(e)}")
-                evaluated_params[key] = None
 
-        # Normalize to required parameters
+        # Evaluate all parameters first
+        evaluated_params = {key: safe_eval_parameter(value) for key, value in raw_params.items()}
+
+        # Normalize parameters
         try:
             clean_params = normalize_parameters(shape, evaluated_params)
         except ValueError as e:
@@ -245,7 +240,14 @@ def handle_visualization(data: dict) -> JSONResponse:
                 content={"type": "error", "content": str(e)},
                 status_code=400
             )
-        
+
+        # Ensure parameters exist before drawing
+        if not clean_params:
+            return JSONResponse(
+                content={"type": "error", "content": "Invalid or missing parameters for visualization."},
+                status_code=400
+            )
+
         # Square detection and explanation update
         if shape == "rectangle":
             width = clean_params.get("width", 0)
@@ -261,16 +263,23 @@ def handle_visualization(data: dict) -> JSONResponse:
             "right_triangle": (draw_right_triangle, ["leg1", "leg2"]),
             "trigonometric": (plot_trigonometric_function, ["function"])
         }
-        
+
         if shape not in visualization_mapping:
             return JSONResponse(
-                content={"type": "error", "content": "Unsupported shape"},
+                content={"type": "error", "content": f"Unsupported shape '{shape}'."},
                 status_code=400
             )
-        
+
         viz_func, expected_params = visualization_mapping[shape]
-        args = [clean_params[p] for p in expected_params]
-        
+        args = [clean_params.get(p) for p in expected_params]
+
+        # Ensure all required params exist
+        if None in args:
+            return JSONResponse(
+                content={"type": "error", "content": "Missing required parameters for drawing."},
+                status_code=400
+            )
+
         img_base64 = viz_func(*args)
         clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
 
@@ -280,7 +289,7 @@ def handle_visualization(data: dict) -> JSONResponse:
             "image": clean_base64,
             "parameters": clean_params
         })
-        
+
     except Exception as e:
         logging.error(f"Visualization failed: {str(e)}")
         return JSONResponse(
