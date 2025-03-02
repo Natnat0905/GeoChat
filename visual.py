@@ -10,12 +10,8 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, Tuple
-from circle import draw_circle, calculate_circumference, calculate_diameter, calculate_area
-from illustration import (
-    draw_right_triangle,
-    draw_rectangle,
-    plot_trigonometric_function
-)
+from circle import (draw_circle, calculate_circumference, calculate_diameter, calculate_area, CIRCLE_NORMALIZATION_RULES)
+from illustration import (draw_right_triangle, draw_rectangle, plot_trigonometric_function)
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -54,31 +50,21 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 - Always include units in explanation but NOT in parameters
 """
 
-# Add after TUTOR_PROMPT
 SHAPE_NORMALIZATION_RULES = {
-    "circle": {
-        "required": ["radius"],
-        "derived": {
-            "radius": [
-                {"source": ["diameter"], "formula": lambda d: d/2},
-                {"source": ["circumference"], "formula": lambda c: c/(2*math.pi)}
-            ]
-        }
-    },
-     "rectangle": {
+    "rectangle": {
         "required": ["width", "height"],
         "derived": {
             "width": [
                 {"source": ["area", "height"], "formula": lambda a, h: a / h},
-                {"source": ["side"], "formula": lambda s: s},  # Square support
-                {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},  # ✅ FIXED
+                {"source": ["side"], "formula": lambda s: s},
+                {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},
                 {"source": ["diagonal", "height"], "formula": lambda d, h: math.sqrt(d**2 - h**2)},
                 {"source": ["perimeter", "height"], "formula": lambda p, h: (p - 2 * h) / 2}
             ],
             "height": [
                 {"source": ["area", "width"], "formula": lambda a, w: a / w},
-                {"source": ["side"], "formula": lambda s: s},  # Square support
-                {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},  # ✅ FIXED
+                {"source": ["side"], "formula": lambda s: s},
+                {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},
                 {"source": ["diagonal", "width"], "formula": lambda d, w: math.sqrt(d**2 - w**2)},
                 {"source": ["perimeter", "width"], "formula": lambda p, w: (p - 2 * w) / 2}
             ]
@@ -89,11 +75,11 @@ SHAPE_NORMALIZATION_RULES = {
         "derived": {
             "leg1": [
                 {"source": ["hypotenuse", "leg2"], 
-                 "formula": lambda h,l2: math.sqrt(h**2 - l2**2)}
+                 "formula": lambda h, l2: math.sqrt(h**2 - l2**2)}
             ],
             "leg2": [
                 {"source": ["hypotenuse", "leg1"], 
-                 "formula": lambda h,l1: math.sqrt(h**2 - l1**2)}
+                 "formula": lambda h, l1: math.sqrt(h**2 - l1**2)}
             ]
         }
     },
@@ -102,6 +88,9 @@ SHAPE_NORMALIZATION_RULES = {
         "derived": {}
     }
 }
+
+# Merge circle rules into SHAPE_NORMALIZATION_RULES dynamically
+SHAPE_NORMALIZATION_RULES["circle"] = CIRCLE_NORMALIZATION_RULES
 
 def enhance_explanation(response: str) -> str:
     replacements = {

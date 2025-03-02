@@ -3,6 +3,7 @@ import math
 import io
 import base64
 
+# Circle-related calculations
 def calculate_circumference(radius: float) -> float:
     """Calculate the circumference of a circle given the radius."""
     return 2 * math.pi * radius
@@ -27,7 +28,7 @@ def draw_circle(radius: float) -> str:
     ax.set_xlim(-radius-1, radius+1)
     ax.set_ylim(-radius-1, radius+1)
     ax.set_aspect('equal', 'box')
-    
+
     ax.set_title(f"Circle with Radius {radius}")
     ax.grid(True)
 
@@ -40,3 +41,14 @@ def generate_image(fig) -> str:
     buf.seek(0)
     plt.close(fig)
     return "data:image/png;base64," + base64.b64encode(buf.read()).decode('utf-8')
+
+# Circle Normalization Rules (Moved from visual.py)
+CIRCLE_NORMALIZATION_RULES = {
+    "required": ["radius"],
+    "derived": {
+        "radius": [
+            {"source": ["diameter"], "formula": lambda d: d / 2},
+            {"source": ["circumference"], "formula": lambda c: c / (2 * math.pi)}
+        ]
+    }
+}
