@@ -5,10 +5,10 @@ import base64
 import io
 
 def draw_rectangle(width: float, height: float, title: str = None) -> str:
-    """Generate rectangle visualization with optional title."""
+    """Generate rectangle (or square) visualization with optional title."""
     fig, ax = plt.subplots(figsize=(7, 6))
     
-    # Create rectangle
+    # Create rectangle or square
     rect = plt.Rectangle((0, 0), width, height, fill=False, color='#17becf', linewidth=2.5)
     ax.add_patch(rect)
     
@@ -25,16 +25,20 @@ def draw_rectangle(width: float, height: float, title: str = None) -> str:
         ax.set_title(title, pad=15)
     else:
         ax.set_title(f"Rectangle Visualization ({width} cm × {height} cm)", pad=15)
-
-    # Configure plot
-    ax.set_xlim(-1, width + 1)
-    ax.set_ylim(-1, height + 1)
-    ax.set_aspect('equal')
-    ax.grid(True, linestyle='--', alpha=0.7)
-    ax.set_xlabel("Centimeters (cm)", labelpad=10)
-    ax.set_ylabel("Centimeters (cm)", labelpad=10)
     
-    return generate_image(fig)
+    ax.set_xlim([-1, width + 1])
+    ax.set_ylim([-1, height + 1])
+    ax.set_aspect('equal', adjustable='box')
+    ax.axis('off')
+
+    # Save image to a bytes buffer and encode it in base64
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight')
+    plt.close(fig)
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+
+    return f"data:image/png;base64,{img_base64}"
 
 def generate_image(fig) -> str:
     """Convert matplotlib figure to base64 encoded PNG"""

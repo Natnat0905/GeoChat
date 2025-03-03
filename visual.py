@@ -1,4 +1,3 @@
-
 import openai
 import os
 import re
@@ -13,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, Tuple
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
-from rectangle import (draw_rectangle,RECTANGLE_NORMALIZATION_RULES)
+from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES)
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -114,10 +113,8 @@ def get_tutor_response(user_message: str) -> dict:
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": TUTOR_PROMPT},
-                {"role": "user", "content": user_message}
-            ],
+            messages=[{"role": "system", "content": TUTOR_PROMPT},
+                      {"role": "user", "content": user_message}],
             max_tokens=650,
             temperature=0.4
         )
@@ -238,31 +235,20 @@ def handle_visualization(data: dict) -> JSONResponse:
         args = [clean_params.get(p) for p in expected_params]
 
         if None in args:
-            return JSONResponse(content={"type": "error", "content": "Missing required parameters for drawing."}, status_code=400)
+            return JSONResponse(content={"type": "error", "content": "Insufficient or invalid parameters."}, status_code=400)
 
-        # Special case: Label square images properly
-        if shape == "rectangle" and abs(clean_params.get("width", 0) - clean_params.get("height", 0)) < 0.001:
-            explanation = explanation.replace("rectangle", "square")
-            explanation += f"\nNote: This is a square with side length {clean_params.get('width', 0):.2f}."
-            title = f"Square Visualization (Side: {clean_params['width']} cm)"
-            img_base64 = draw_rectangle(clean_params["width"], clean_params["height"], title)
-        else:
-            # Call the drawing function without passing an extra title
-            img_base64 = viz_func(*args)
+        # Process the drawing and return as base64
+        image_data = viz_func(*args)
+        image_base64 = base64.b64encode(image_data).decode('utf-8')
 
-        clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
-
-        return JSONResponse(content={
-            "type": "visual",
+        response_content = {
+            "type": "image",
+            "content": image_base64,
             "explanation": explanation,
-            "image": clean_base64,
-            "parameters": clean_params
-        })
+        }
+
+        return JSONResponse(content=response_content)
 
     except Exception as e:
-        logging.error(f"Visualization Error: {e}")
-        return JSONResponse(content={"type": "error", "content": "Error in visualization generation."}, status_code=500)
-
-@app.get("/health")
-async def health_check():
-    return {"status": "active", "service": "Math Tutor API v2.0"}
+        logging.error(f"Visualization error: {str(e)}")
+        return JSONResponse(content={"type": "error", "content": f"Visualization failed: {str(e)}"}, status_code=500)
