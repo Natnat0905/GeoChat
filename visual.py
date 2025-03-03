@@ -10,9 +10,8 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, Tuple
-from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES)
-from illustration import (draw_right_triangle, plot_trigonometric_function)
-from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES)
+from circle import (draw_circle, calculate_circumference, calculate_diameter, calculate_area, CIRCLE_NORMALIZATION_RULES)
+from illustration import (draw_right_triangle, draw_rectangle, plot_trigonometric_function)
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -45,18 +44,32 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 - Supported shapes: circle, rectangle, right_triangle, trigonometric
 - For rectangles/squares:
   - Use width/height pair OR area with one dimension
-  - For squares, ALWAYS use "side" parameter. Convert any given attributes:
-    - Perimeter: side = perimeter / 4
-    - Diagonal: side = diagonal / √2
-    - Area: side = √area
-  - Example square: {"shape":"rectangle", "parameters":{"side":25}} (Perimeter 100)
-  - Example square: {"shape":"rectangle", "parameters":{"side":9.899}} (Diagonal 14)
-  - Example rectangle: {"shape":"rectangle", "parameters":{"area":20, "height":4}}
+  - For squares, use "side" parameter
+- Example square: {"shape":"rectangle", "parameters":{"side":5}}
+- Example rectangle: {"shape":"rectangle", "parameters":{"area":20, "height":4}}
 - Always include units in explanation but NOT in parameters
 """
 
-# Normalization rules for shapes (circle, rectangle, etc.)
 SHAPE_NORMALIZATION_RULES = {
+    "rectangle": {
+        "required": ["width", "height"],
+        "derived": {
+            "width": [
+                {"source": ["area", "height"], "formula": lambda a, h: a / h},
+                {"source": ["side"], "formula": lambda s: s},
+                {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},
+                {"source": ["diagonal", "height"], "formula": lambda d, h: math.sqrt(d**2 - h**2)},
+                {"source": ["perimeter", "height"], "formula": lambda p, h: (p - 2 * h) / 2}
+            ],
+            "height": [
+                {"source": ["area", "width"], "formula": lambda a, w: a / w},
+                {"source": ["side"], "formula": lambda s: s},
+                {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},
+                {"source": ["diagonal", "width"], "formula": lambda d, w: math.sqrt(d**2 - w**2)},
+                {"source": ["perimeter", "width"], "formula": lambda p, w: (p - 2 * w) / 2}
+            ]
+        }
+    },
     "right_triangle": {
         "required": ["leg1", "leg2"],
         "derived": {
@@ -78,7 +91,6 @@ SHAPE_NORMALIZATION_RULES = {
 
 # Merge circle rules into SHAPE_NORMALIZATION_RULES dynamically
 SHAPE_NORMALIZATION_RULES["circle"] = CIRCLE_NORMALIZATION_RULES
-SHAPE_NORMALIZATION_RULES["rectangle"] = RECTANGLE_NORMALIZATION_RULES
 
 def enhance_explanation(response: str) -> str:
     replacements = {
@@ -114,8 +126,10 @@ def get_tutor_response(user_message: str) -> dict:
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "system", "content": TUTOR_PROMPT},
-                      {"role": "user", "content": user_message}],
+            messages=[
+                {"role": "system", "content": TUTOR_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
             max_tokens=650,
             temperature=0.4
         )
@@ -160,40 +174,34 @@ async def tutor_endpoint(message: Message):
 
     
 def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, float]:
-    """Normalize parameters to required values using defined rules."""
+    """Normalize parameters to required values using defined rules"""
     rules = SHAPE_NORMALIZATION_RULES.get(shape, {})
     required = rules.get("required", [])
     derived = rules.get("derived", {})
 
-    normalized = {k: v for k, v in params.items() if v is not None}
+    normalized = {k: v for k, v in params.items() if v is not None}  # Ignore None values
 
+    # Special case for squares
     if shape == "rectangle" and "side" in normalized:
         normalized["width"] = normalized["side"]
         normalized["height"] = normalized["side"]
 
-    attempts = 3  
+    attempts = 3  # Prevent infinite loops
     while attempts > 0:
         missing = [p for p in required if p not in normalized]
-        if not missing: 
-            break
+        if not missing: break
 
         for param in missing:
             for formula in derived.get(param, []):
-                sources = [normalized.get(s) for s in formula["source"]]
-                
-                if all(s is not None for s in sources):
+                if all(s in normalized for s in formula["source"]):
                     try:
-                        result = formula["formula"](*sources)
+                        result = formula["formula"](*[normalized[s] for s in formula["source"]])
                         if result is not None:
                             normalized[param] = result
                             break
                     except Exception as e:
                         logging.warning(f"Formula failed for {param} from {formula['source']}: {e}")
-        
         attempts -= 1
-
-    # Debugging output
-    logging.info(f"Normalized parameters for {shape}: {normalized}")
 
     # Ensure all required parameters exist
     for p in required:
@@ -204,7 +212,7 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
 
 def handle_visualization(data: dict) -> JSONResponse:
     try:
-        # Extract and normalize input data
+        # Sanitize and extract input data
         shape = data["shape"].lower().replace(" ", "_")
         explanation = data.get("explanation", "")
         raw_params = data.get("parameters", {})
@@ -228,28 +236,44 @@ def handle_visualization(data: dict) -> JSONResponse:
             "trigonometric": (plot_trigonometric_function, ["function"])
         }
 
-        # Check if the shape is valid
+        # Check if the shape is valid and fetch corresponding function and parameters
         if shape not in visualization_mapping:
-            return JSONResponse(content={"type": "error", "content": f"Unsupported shape '{shape}'."}, status_code=400)
+            return JSONResponse(
+                content={"type": "error", "content": f"Unsupported shape '{shape}'."},
+                status_code=400
+            )
 
         viz_func, expected_params = visualization_mapping[shape]
         args = [clean_params.get(p) for p in expected_params]
 
+        # Handle missing or invalid parameters
         if None in args:
-            return JSONResponse(content={"type": "error", "content": "Insufficient or invalid parameters."}, status_code=400)
+            return JSONResponse(
+                content={"type": "error", "content": "Missing required parameters for drawing."},
+                status_code=400
+            )
 
-        # Process the drawing and return as base64
-        image_data = viz_func(*args)
-        image_base64 = image_data.split(",")[-1]  # Extract the base64 part
+        # Special case for rectangles that are actually squares
+        if shape == "rectangle" and abs(clean_params.get("width", 0) - clean_params.get("height", 0)) < 0.001:
+            explanation = explanation.replace("rectangle", "square")
+            explanation += f"\nNote: This is a square with side length {clean_params.get('width', 0):.2f}."
+            return draw_rectangle(clean_params["width"], clean_params["height"], explanation)
 
-        response_content = {
-            "type": "image",
-            "content": image_base64,
+        # Call the drawing function and return the image in base64 format
+        img_base64 = viz_func(*args)
+        clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
+
+        return JSONResponse(content={
+            "type": "visual",
             "explanation": explanation,
-        }
-
-        return JSONResponse(content=response_content)
+            "image": clean_base64,
+            "parameters": clean_params
+        })
 
     except Exception as e:
-        logging.error(f"Visualization error: {str(e)}")
-        return JSONResponse(content={"type": "error", "content": f"Visualization failed: {str(e)}"}, status_code=500)
+        logging.error(f"Visualization Error: {e}")
+        return JSONResponse(content={"type": "error", "content": "Error in visualization generation."}, status_code=500)
+
+@app.get("/health")
+async def health_check():
+    return {"status": "active", "service": "Math Tutor API v2.0"}
