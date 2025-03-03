@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, Tuple
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES)
-from illustration import (draw_right_triangle, draw_rectangle, plot_trigonometric_function)
+from illustration import (draw_right_triangle, plot_trigonometric_function)
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -51,25 +51,6 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 """
 
 SHAPE_NORMALIZATION_RULES = {
-    "rectangle": {
-        "required": ["width", "height"],
-        "derived": {
-            "width": [
-                {"source": ["area", "height"], "formula": lambda a, h: a / h},
-                {"source": ["side"], "formula": lambda s: s},
-                {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},
-                {"source": ["diagonal", "height"], "formula": lambda d, h: math.sqrt(d**2 - h**2)},
-                {"source": ["perimeter", "height"], "formula": lambda p, h: (p - 2 * h) / 2}
-            ],
-            "height": [
-                {"source": ["area", "width"], "formula": lambda a, w: a / w},
-                {"source": ["side"], "formula": lambda s: s},
-                {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},
-                {"source": ["diagonal", "width"], "formula": lambda d, w: math.sqrt(d**2 - w**2)},
-                {"source": ["perimeter", "width"], "formula": lambda p, w: (p - 2 * w) / 2}
-            ]
-        }
-    },
     "right_triangle": {
         "required": ["leg1", "leg2"],
         "derived": {
