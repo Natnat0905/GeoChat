@@ -68,20 +68,27 @@ def normalize_square_parameters(params: dict) -> dict:
     normalized = {k: v for k, v in params.items() if v is not None}  # Ignore None values
 
     if "side" in normalized:  # Square case
-        normalized["width"] = normalized["side"]
-        normalized["height"] = normalized["side"]
+        side_length = normalized["side"]
+        normalized["width"] = side_length
+        normalized["height"] = side_length
 
     elif "perimeter" in normalized and "width" not in normalized:  
         # Convert perimeter to side length
-        normalized["width"] = normalized["height"] = normalized["perimeter"] / 4
+        side_length = normalized["perimeter"] / 4
+        normalized["width"] = side_length
+        normalized["height"] = side_length
 
     elif "diagonal" in normalized and "width" not in normalized:  
         # Convert diagonal to side length using √2 rule
-        normalized["width"] = normalized["height"] = normalized["diagonal"] / math.sqrt(2)
+        side_length = normalized["diagonal"] / math.sqrt(2)
+        normalized["width"] = side_length
+        normalized["height"] = side_length
 
     elif "area" in normalized and "width" not in normalized:  
         # Convert area to side length using √area rule
-        normalized["width"] = normalized["height"] = math.sqrt(normalized["area"])
+        side_length = math.sqrt(normalized["area"])
+        normalized["width"] = side_length
+        normalized["height"] = side_length
 
     return normalized
 
