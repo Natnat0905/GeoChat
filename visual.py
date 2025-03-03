@@ -194,12 +194,10 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
 
 def handle_visualization(data: dict) -> JSONResponse:
     try:
-        # Sanitize and extract input data
         shape = data["shape"].lower().replace(" ", "_")
         explanation = data.get("explanation", "")
         raw_params = data.get("parameters", {})
 
-        # Safely evaluate parameters
         evaluated_params = {key: safe_eval_parameter(value) for key, value in raw_params.items()}
 
         try:
@@ -208,9 +206,8 @@ def handle_visualization(data: dict) -> JSONResponse:
             return JSONResponse(content={"type": "error", "content": str(e)}, status_code=400)
 
         if not clean_params:
-            return JSONResponse(content={"type": "error", "content": "Invalid or missing parameters for visualization."}, status_code=400)
+            return JSONResponse(content={"type": "error", "content": "Invalid parameters."}, status_code=400)
 
-        # Unified visualization mapping
         visualization_mapping = {
             "circle": (draw_circle, ["radius"]),
             "rectangle": (draw_rectangle, ["width", "height"]),
@@ -218,7 +215,6 @@ def handle_visualization(data: dict) -> JSONResponse:
             "trigonometric": (plot_trigonometric_function, ["function"])
         }
 
-        # Check if the shape is valid and fetch corresponding function and parameters
         if shape not in visualization_mapping:
             return JSONResponse(
                 content={"type": "error", "content": f"Unsupported shape '{shape}'."},
@@ -228,20 +224,25 @@ def handle_visualization(data: dict) -> JSONResponse:
         viz_func, expected_params = visualization_mapping[shape]
         args = [clean_params.get(p) for p in expected_params]
 
-        # Handle missing or invalid parameters
         if None in args:
             return JSONResponse(
-                content={"type": "error", "content": "Missing required parameters for drawing."},
+                content={"type": "error", "content": "Missing parameters."},
                 status_code=400
             )
 
-        # Special case for rectangles that are actually squares
+        # Handle square case
         if shape == "rectangle" and abs(clean_params.get("width", 0) - clean_params.get("height", 0)) < 0.001:
             explanation = explanation.replace("rectangle", "square")
-            explanation += f"\nNote: This is a square with side length {clean_params.get('width', 0):.2f}."
-            return draw_rectangle(clean_params["width"], clean_params["height"], explanation)
+            explanation += f"\nNote: Square with side length {clean_params['width']:.2f} cm."
+            img_base64 = draw_rectangle(clean_params["width"], clean_params["height"])
+            clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
+            return JSONResponse(content={
+                "type": "visual",
+                "explanation": explanation,
+                "image": clean_base64,
+                "parameters": clean_params
+            })
 
-        # Call the drawing function and return the image in base64 format
         img_base64 = viz_func(*args)
         clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
 
@@ -254,7 +255,7 @@ def handle_visualization(data: dict) -> JSONResponse:
 
     except Exception as e:
         logging.error(f"Visualization Error: {e}")
-        return JSONResponse(content={"type": "error", "content": "Error in visualization generation."}, status_code=500)
+        return JSONResponse(content={"type": "error", "content": "Error generating image."}, status_code=500)
 
 @app.get("/health")
 async def health_check():

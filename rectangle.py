@@ -8,30 +8,29 @@ def draw_rectangle(width: float, height: float, title: str = None) -> str:
     """Generate rectangle (or square) visualization with optional title."""
     fig, ax = plt.subplots(figsize=(7, 6))
     
-    # Create rectangle or square
     rect = plt.Rectangle((0, 0), width, height, fill=False, color='#17becf', linewidth=2.5)
     ax.add_patch(rect)
     
-    # Add measurements
     ax.text(width/2, -0.1*height, f'Width: {width} cm', ha='center', va='top', color='#2ca02c')
     ax.text(-0.1*width, height/2, f'Height: {height} cm', ha='right', va='center', rotation=90, color='#2ca02c')
 
-    # Add area calculation
     ax.text(width/2, height/2, f'Area = {width} × {height}\n= {width*height} cm²', 
            ha='center', va='center', bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
 
-    # Set title
+    # Set title based on whether it's a square
     if title:
         ax.set_title(title, pad=15)
     else:
-        ax.set_title(f"Rectangle Visualization ({width} cm × {height} cm)", pad=15)
+        if width == height:
+            ax.set_title(f"Square (Side {width} cm)", pad=15)
+        else:
+            ax.set_title(f"Rectangle ({width} cm × {height} cm)", pad=15)
     
     ax.set_xlim([-1, width + 1])
     ax.set_ylim([-1, height + 1])
     ax.set_aspect('equal', adjustable='box')
     ax.axis('off')
 
-    # Save image to a bytes buffer and encode it in base64
     buf = io.BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight')
     plt.close(fig)
