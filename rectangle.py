@@ -60,6 +60,31 @@ def generate_image(fig) -> str:
     plt.close(fig)
     return "data:image/png;base64," + base64.b64encode(buf.read()).decode('utf-8')  # Add data URI prefix
 
+def normalize_square_parameters(params: dict) -> dict:
+    """
+    Normalize square-related parameters to determine side length from 
+    perimeter, diagonal, or area if they are given.
+    """
+    normalized = {k: v for k, v in params.items() if v is not None}  # Ignore None values
+
+    if "side" in normalized:  # Square case
+        normalized["width"] = normalized["side"]
+        normalized["height"] = normalized["side"]
+
+    elif "perimeter" in normalized and "width" not in normalized:  
+        # Convert perimeter to side length
+        normalized["width"] = normalized["height"] = normalized["perimeter"] / 4
+
+    elif "diagonal" in normalized and "width" not in normalized:  
+        # Convert diagonal to side length using √2 rule
+        normalized["width"] = normalized["height"] = normalized["diagonal"] / math.sqrt(2)
+
+    elif "area" in normalized and "width" not in normalized:  
+        # Convert area to side length using √area rule
+        normalized["width"] = normalized["height"] = math.sqrt(normalized["area"])
+
+    return normalized
+
 # Rules for normalization and formula calculations
 RECTANGLE_NORMALIZATION_RULES = {
     "rectangle": {

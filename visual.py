@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, Tuple
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES)
-from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES)
+from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
 
 app = FastAPI()
@@ -163,10 +163,8 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
 
     normalized = {k: v for k, v in params.items() if v is not None}  # Ignore None values
 
-    # Special case for squares
-    if shape == "rectangle" and "side" in normalized:
-        normalized["width"] = normalized["side"]
-        normalized["height"] = normalized["side"]
+    if shape == "rectangle":  # Check for squares
+        params = normalize_square_parameters(params)
 
     attempts = 3  # Prevent infinite loops
     while attempts > 0:
