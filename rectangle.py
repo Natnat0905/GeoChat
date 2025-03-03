@@ -4,30 +4,34 @@ import math
 import base64
 import io
 
-
 def draw_rectangle(width: float, height: float, title: str = None) -> str:
-    """Generate a rectangle (or square) visualization on a graph."""
-    fig, ax = plt.subplots(figsize=(7, 6))
+    """Generate a rectangle (or square) visualization on a properly scaled graph."""
+    fig, ax = plt.subplots(figsize=(7, 7))  # Square figure for correct aspect ratio
 
-    # Define rectangle coordinates (centered at origin for consistency with the circle)
-    x = -width / 2
-    y = -height / 2
-
-    rect = plt.Rectangle((x, y), width, height, fill=False, color='blue', linewidth=2)
+    # Set the lower-left corner of the rectangle at (0,0) for intuitive placement
+    rect = plt.Rectangle((0, 0), width, height, fill=False, color='blue', linewidth=2)
     ax.add_patch(rect)
 
-    # Set limits to maintain spacing
-    max_dim = max(width, height) + 2
-    ax.set_xlim(-max_dim / 2, max_dim / 2)
-    ax.set_ylim(-max_dim / 2, max_dim / 2)
-    ax.set_aspect('equal', adjustable='box')
+    # Dynamic axis limits
+    max_dim = max(width, height)
+    padding = max_dim * 0.2  # Add 20% padding for better visualization
+    ax.set_xlim(-padding, width + padding)
+    ax.set_ylim(-padding, height + padding)
 
-    # Add labels for width and height
-    ax.text(0, y - 0.5, f'Width: {width} cm', ha='center', color='green')
-    ax.text(x - 0.5, 0, f'Height: {height} cm', va='center', rotation=90, color='green')
+    # Ensure equal aspect ratio
+    ax.set_aspect('equal', adjustable='datalim')
 
-    # Area label inside the rectangle
-    ax.text(0, 0, f'Area = {width} × {height}\n= {width * height} cm²',
+    # Grid and axis settings
+    ax.grid(True, linestyle="--", linewidth=0.5)
+    ax.axhline(0, color='black', linewidth=0.8)
+    ax.axvline(0, color='black', linewidth=0.8)
+
+    # Add width and height labels
+    ax.text(width / 2, -padding / 2, f'Width: {width} cm', ha='center', color='green')
+    ax.text(-padding / 2, height / 2, f'Height: {height} cm', va='center', rotation=90, color='green')
+
+    # Area label in the center of the rectangle
+    ax.text(width / 2, height / 2, f'Area = {width} × {height}\n= {width * height} cm²',
             ha='center', va='center', bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
 
     # Set title based on whether it's a square
@@ -38,11 +42,6 @@ def draw_rectangle(width: float, height: float, title: str = None) -> str:
             ax.set_title(f"Square (Side {width} cm)", pad=15)
         else:
             ax.set_title(f"Rectangle ({width} cm × {height} cm)", pad=15)
-
-    # Grid and axis lines
-    ax.grid(True)
-    ax.axhline(0, color='black', linewidth=0.8)
-    ax.axvline(0, color='black', linewidth=0.8)
 
     # Save image to base64 format
     buf = io.BytesIO()
