@@ -143,8 +143,11 @@ async def tutor_endpoint(message: Message):
         should_draw = any(keyword in user_input.lower() for keyword in ["draw", "illustrate", "sketch", "visualize"])
 
         if "shape" in response:
+            # Normalize the parameters and handle visualization if required
+            normalized_params = normalize_parameters(response["shape"], response.get("parameters", {}))
             if should_draw:
-                return handle_visualization(response)
+                # Call the function to generate visualization for the shape
+                return handle_visualization({"shape": response["shape"], "parameters": normalized_params, "explanation": response.get("explanation", "")})
             else:
                 return JSONResponse(content={"type": "text", "content": response.get("explanation", "Let's work through this step by step...")})
 
