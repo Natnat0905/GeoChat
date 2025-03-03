@@ -55,6 +55,7 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 - Always include units in explanation but NOT in parameters
 """
 
+# Normalization rules for shapes (circle, rectangle, etc.)
 SHAPE_NORMALIZATION_RULES = {
     "right_triangle": {
         "required": ["leg1", "leg2"],
@@ -239,7 +240,7 @@ def handle_visualization(data: dict) -> JSONResponse:
 
         # Process the drawing and return as base64
         image_data = viz_func(*args)
-        image_base64 = base64.b64encode(image_data).decode('utf-8')
+        image_base64 = image_data.split(",")[-1]  # Extract the base64 part
 
         response_content = {
             "type": "image",
