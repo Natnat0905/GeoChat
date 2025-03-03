@@ -1,3 +1,4 @@
+
 import openai
 import os
 import re
@@ -162,18 +163,17 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
     required = rules.get("required", [])
     derived = rules.get("derived", {})
 
-    normalized = {k: v for k, v in params.items() if v is not None}  # Ignore None values
+    normalized = {k: v for k, v in params.items() if v is not None}
 
-    # Special case for squares
     if shape == "rectangle" and "side" in normalized:
         normalized["width"] = normalized["side"]
         normalized["height"] = normalized["side"]
 
-    attempts = 5  # Ensure we retry enough times to resolve all parameters
+    attempts = 3  
     while attempts > 0:
         missing = [p for p in required if p not in normalized]
-        if not missing:
-            break  # Exit when all required parameters are found
+        if not missing: 
+            break
 
         for param in missing:
             for formula in derived.get(param, []):
@@ -187,7 +187,7 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
                             break
                     except Exception as e:
                         logging.warning(f"Formula failed for {param} from {formula['source']}: {e}")
-
+        
         attempts -= 1
 
     # Debugging output
@@ -237,15 +237,14 @@ def handle_visualization(data: dict) -> JSONResponse:
             return JSONResponse(content={"type": "error", "content": "Missing required parameters for drawing."}, status_code=400)
 
         # Special case: Label square images properly
-        if shape == "rectangle" and abs(clean_params["width"] - clean_params["height"]) < 0.001:
+        if shape == "rectangle" and abs(clean_params.get("width", 0) - clean_params.get("height", 0)) < 0.001:
             explanation = explanation.replace("rectangle", "square")
-            explanation += f"\nNote: This is a square with side length {clean_params['width']:.2f}."
+            explanation += f"\nNote: This is a square with side length {clean_params.get('width', 0):.2f}."
             title = f"Square Visualization (Side: {clean_params['width']} cm)"
             img_base64 = draw_rectangle(clean_params["width"], clean_params["height"], title)
         else:
-            # Standard rectangle
-            title = f"Rectangle Visualization ({clean_params['width']} cm × {clean_params['height']} cm)"
-            img_base64 = draw_rectangle(clean_params["width"], clean_params["height"], title)
+            # Call the drawing function without passing an extra title
+            img_base64 = viz_func(*args)
 
         clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
 
