@@ -46,9 +46,13 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 - Supported shapes: circle, rectangle, right_triangle, trigonometric
 - For rectangles/squares:
   - Use width/height pair OR area with one dimension
-  - For squares, use "side" parameter
-- Example square: {"shape":"rectangle", "parameters":{"side":5}}
-- Example rectangle: {"shape":"rectangle", "parameters":{"area":20, "height":4}}
+  - For squares, ALWAYS use "side" parameter. Convert any given attributes:
+    - Perimeter: side = perimeter / 4
+    - Diagonal: side = diagonal / √2
+    - Area: side = √area
+  - Example square: {"shape":"rectangle", "parameters":{"side":25}} (Perimeter 100)
+  - Example square: {"shape":"rectangle", "parameters":{"side":9.899}} (Diagonal 14)
+  - Example rectangle: {"shape":"rectangle", "parameters":{"area":20, "height":4}}
 - Always include units in explanation but NOT in parameters
 """
 

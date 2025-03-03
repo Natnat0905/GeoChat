@@ -44,21 +44,24 @@ def generate_image(fig) -> str:
     plt.close(fig)
     return "data:image/png;base64," + base64.b64encode(buf.read()).decode('utf-8')  # Add data URI prefix
 
+# Rules for normalization and formula calculations
 RECTANGLE_NORMALIZATION_RULES = {
-        "rectangle": {
-            "required": ["width", "height"],
-            "derived": {
-                "width": [
+    "rectangle": {
+        "required": ["width", "height"],
+        "derived": {
+            "width": [
                 {"source": ["area", "height"], "formula": lambda a, h: a / h},
                 {"source": ["side"], "formula": lambda s: s},
                 {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},
+                {"source": ["perimeter"], "formula": lambda p: p / 4},  # For squares
                 {"source": ["diagonal", "height"], "formula": lambda d, h: math.sqrt(d**2 - h**2)},
                 {"source": ["perimeter", "height"], "formula": lambda p, h: (p - 2 * h) / 2}
             ],
-                "height": [
+            "height": [
                 {"source": ["area", "width"], "formula": lambda a, w: a / w},
                 {"source": ["side"], "formula": lambda s: s},
                 {"source": ["diagonal"], "formula": lambda d: d / math.sqrt(2)},
+                {"source": ["perimeter"], "formula": lambda p: p / 4},  # For squares
                 {"source": ["diagonal", "width"], "formula": lambda d, w: math.sqrt(d**2 - w**2)},
                 {"source": ["perimeter", "width"], "formula": lambda p, w: (p - 2 * w) / 2}
             ]
