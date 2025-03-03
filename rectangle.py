@@ -4,18 +4,31 @@ import math
 import base64
 import io
 
-def draw_rectangle(width: float, height: float, title: str = None) -> str:
-    """Generate rectangle (or square) visualization with optional title."""
-    fig, ax = plt.subplots(figsize=(7, 6))
-    
-    rect = plt.Rectangle((0, 0), width, height, fill=False, color='#17becf', linewidth=2.5)
-    ax.add_patch(rect)
-    
-    ax.text(width/2, -0.1*height, f'Width: {width} cm', ha='center', va='top', color='#2ca02c')
-    ax.text(-0.1*width, height/2, f'Height: {height} cm', ha='right', va='center', rotation=90, color='#2ca02c')
 
-    ax.text(width/2, height/2, f'Area = {width} × {height}\n= {width*height} cm²', 
-           ha='center', va='center', bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
+def draw_rectangle(width: float, height: float, title: str = None) -> str:
+    """Generate a rectangle (or square) visualization on a graph."""
+    fig, ax = plt.subplots(figsize=(7, 6))
+
+    # Define rectangle coordinates (centered at origin for consistency with the circle)
+    x = -width / 2
+    y = -height / 2
+
+    rect = plt.Rectangle((x, y), width, height, fill=False, color='blue', linewidth=2)
+    ax.add_patch(rect)
+
+    # Set limits to maintain spacing
+    max_dim = max(width, height) + 2
+    ax.set_xlim(-max_dim / 2, max_dim / 2)
+    ax.set_ylim(-max_dim / 2, max_dim / 2)
+    ax.set_aspect('equal', adjustable='box')
+
+    # Add labels for width and height
+    ax.text(0, y - 0.5, f'Width: {width} cm', ha='center', color='green')
+    ax.text(x - 0.5, 0, f'Height: {height} cm', va='center', rotation=90, color='green')
+
+    # Area label inside the rectangle
+    ax.text(0, 0, f'Area = {width} × {height}\n= {width * height} cm²',
+            ha='center', va='center', bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
 
     # Set title based on whether it's a square
     if title:
@@ -25,12 +38,13 @@ def draw_rectangle(width: float, height: float, title: str = None) -> str:
             ax.set_title(f"Square (Side {width} cm)", pad=15)
         else:
             ax.set_title(f"Rectangle ({width} cm × {height} cm)", pad=15)
-    
-    ax.set_xlim([-1, width + 1])
-    ax.set_ylim([-1, height + 1])
-    ax.set_aspect('equal', adjustable='box')
-    ax.axis('off')
 
+    # Grid and axis lines
+    ax.grid(True)
+    ax.axhline(0, color='black', linewidth=0.8)
+    ax.axvline(0, color='black', linewidth=0.8)
+
+    # Save image to base64 format
     buf = io.BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight')
     plt.close(fig)
