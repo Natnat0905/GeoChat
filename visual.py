@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, Tuple
-from circle import (draw_circle, calculate_circumference, calculate_diameter, calculate_area, CIRCLE_NORMALIZATION_RULES)
+from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES)
 from illustration import (draw_right_triangle, draw_rectangle, plot_trigonometric_function)
 
 app = FastAPI()
