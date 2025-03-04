@@ -208,11 +208,11 @@ def handle_visualization(data: dict) -> JSONResponse:
         evaluated_params = {key: safe_eval_parameter(value) for key, value in raw_params.items()}
         clean_params = normalize_parameters(shape, evaluated_params)
 
-        if not clean_params or "width" not in clean_params or "height" not in clean_params:
+        if not clean_params:
             return JSONResponse(content={"type": "error", "content": "Invalid parameters for drawing."}, status_code=400)
 
         visualization_mapping = {
-            "circle": (draw_circle, ["radius"]),
+            "circle": (draw_circle, ["radius"]),  # Ensure only 'radius' is passed for circles
             "rectangle": (draw_rectangle, ["width", "height"]),
             "right_triangle": (draw_right_triangle, ["leg1", "leg2"]),
             "trigonometric": (plot_trigonometric_function, ["function"])
@@ -224,12 +224,14 @@ def handle_visualization(data: dict) -> JSONResponse:
                 status_code=400
             )
 
+        # Extract the corresponding function and expected parameters
         viz_func, expected_params = visualization_mapping[shape]
         args = [clean_params.get(p) for p in expected_params]
 
+        # Check if all expected parameters are available
         if None in args:
             return JSONResponse(
-                content={"type": "error", "content": "Missing required parameters for drawing."},
+                content={"type": "error", "content": f"Missing required parameters for {shape} drawing."},
                 status_code=400
             )
 
@@ -238,7 +240,14 @@ def handle_visualization(data: dict) -> JSONResponse:
             explanation = explanation.replace("rectangle", "square")
             explanation += f"\nNote: Square with side length {clean_params['width']:.2f} cm."
         
-        img_base64 = draw_rectangle(clean_params["width"], clean_params["height"])
+        # Generate the image
+        if shape == "circle":
+            # Only pass the radius for circle drawing
+            img_base64 = draw_circle(clean_params["radius"])
+        else:
+            img_base64 = viz_func(*args)
+
+        # Clean the base64 string to remove prefix
         clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
 
         return JSONResponse(content={
@@ -251,7 +260,6 @@ def handle_visualization(data: dict) -> JSONResponse:
     except Exception as e:
         logging.error(f"Visualization Error: {e}")
         return JSONResponse(content={"type": "error", "content": "Error generating image."}, status_code=500)
-
 
 @app.get("/health")
 async def health_check():
