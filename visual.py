@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, Tuple
-from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES)
+from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters)
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
 
@@ -163,6 +163,9 @@ def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, floa
     
     if shape == "rectangle":  # Check for squares
         params = normalize_square_parameters(params)  # This modifies params correctly
+
+    elif shape == "circle":  
+        params = normalize_circle_parameters(params)  # Convert circles
 
     rules = SHAPE_NORMALIZATION_RULES.get(shape, {})
     required = rules.get("required", [])
