@@ -1,18 +1,28 @@
+# Updated visual.py
 import openai
 import os
 import re
+import tempfile
+import shutil
 import json
 import logging
 import math
 import base64
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, Optional, Tuple
+from PIL import Image
+import pytesseract
+from io import BytesIO
+import numpy as np
+import cv2
+from sympy import sympify, SympifyError
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters)
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
+from image import (extract_text_from_image, parse_math_expression)
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -156,7 +166,78 @@ async def tutor_endpoint(message: Message):
     except Exception as e:
         logging.error(f"Endpoint error: {str(e)}")
         return JSONResponse(content={"type": "error", "content": "Please try rephrasing your question"}, status_code=500)
+    
+@app.post("/process-image")
+async def process_image(file: UploadFile = File(...)):
+    temp_path = None
+    try:
+        # Validate content type
+        if not file.content_type.startswith('image/'):
+            return JSONResponse(
+                content={"type": "error", "content": "Invalid file type"},
+                status_code=400
+            )
 
+        # Limit file size
+        MAX_SIZE = 5 * 1024 * 1024  # 5MB
+        if file.size > MAX_SIZE:
+            return JSONResponse(
+                content={"type": "error", "content": "File too large (max 5MB)"},
+                status_code=400
+            )
+
+        # Save uploaded image
+        with tempfile.NamedTemporaryFile(delete=False) as temp:
+            content = await file.read()
+            if len(content) > MAX_SIZE:
+                raise ValueError("File size exceeds limit")
+            temp.write(content)
+            temp_path = temp.name
+
+        # OCR processing
+        extracted_text = extract_text_from_image(temp_path)
+        logging.info(f"Extracted text: {extracted_text}")
+
+        # Math parsing
+        math_problem = parse_math_expression(extracted_text)
+        if not math_problem:
+            return JSONResponse(
+                content={"type": "error", "content": "No math problem detected"},
+                status_code=400
+            )
+
+        # Get tutor response
+        tutor_response = get_tutor_response(math_problem)
+        return handle_tutor_response(math_problem, tutor_response)
+
+    except Exception as e:
+        logging.error(f"Image processing error: {str(e)}")
+        return JSONResponse(
+            content={"type": "error", "content": "Error processing image"},
+            status_code=500
+        )
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+def handle_tutor_response(math_problem: str, tutor_response: dict) -> JSONResponse:
+    try:
+        # Handle the tutor's response, which might include a visualization
+        explanation = tutor_response.get("explanation", "")
+        shape = tutor_response.get("shape", "").lower()
+        parameters = tutor_response.get("parameters", {})
+
+        should_draw = any(keyword in math_problem.lower() for keyword in ["draw", "illustrate", "sketch", "visualize"])
+        
+        # Handle the visualization part if needed
+        if should_draw and shape:
+            return handle_visualization({"shape": shape, "parameters": parameters, "explanation": explanation})
+        else:
+            return JSONResponse(content={"type": "text", "content": explanation})
+
+    except Exception as e:
+        logging.error(f"Error in handle_tutor_response: {str(e)}")
+        return JSONResponse(content={"type": "error", "content": "Error processing the tutor's response"}, status_code=500)
     
 def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, float]:
     """Normalize parameters to required values using defined rules"""
