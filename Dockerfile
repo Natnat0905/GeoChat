@@ -1,5 +1,5 @@
-# Use the official Python 3.9 image as the base image
-FROM python:3.9-slim
+# Use the official Python 3.10 image as the base image
+FROM python:3.10-slim
 
 # Set environment variables to prevent Python from writing .pyc files and buffer output
 ENV PYTHONUNBUFFERED 1
