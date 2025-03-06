@@ -1,58 +1,34 @@
-import pytesseract
-from PIL import Image, ImageEnhance, ImageFilter
-import re
+import requests
 import logging
-from sympy import parse_expr, SympifyError
 import os
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-
-def preprocess_image(image_path: str) -> Image.Image:
-    """Preprocess the image to improve OCR accuracy."""
-    try:
-        img = Image.open(image_path)
-        img = img.convert('L')  # Convert to grayscale
-        enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(2.0)  # Increase contrast
-        img = img.point(lambda x: 0 if x < 128 else 255, '1')  # Apply thresholding
-        img = img.filter(ImageFilter.MedianFilter(size=3))  # Denoise
-        return img
-    except Exception as e:
-        logging.error(f"Image preprocessing failed: {e}")
-        raise RuntimeError("Image preprocessing error")
+OCR_API_KEY = os.getenv("OCR_API_KEY")  # Your OCR SPACE API key
+OCR_API_URL = "https://api.ocr.space/parse/image"  # OCR SPACE endpoint
 
 def extract_text_from_image(image_path: str) -> str:
-    """Extract text from an image using Tesseract OCR."""
+    """Extract text from an image using OCR SPACE API."""
     try:
-        processed_image = preprocess_image(image_path)
-        text = pytesseract.image_to_string(processed_image)
-        return text.strip()
+        with open(image_path, 'rb') as img_file:
+            files = {'image': img_file}
+            payload = {'apikey': OCR_API_KEY}
+            
+            # Make the API request
+            response = requests.post(OCR_API_URL, files=files, data=payload)
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                # Check if OCR was successful
+                if result.get("OCRExitCode") == 1:
+                    text = result.get("ParsedResults")[0].get("ParsedText")
+                    return text.strip() if text else ""
+                else:
+                    logging.error(f"OCR API Error: {result.get('ErrorMessage')}")
+                    raise RuntimeError("OCR API processing failed")
+            else:
+                logging.error(f"OCR API Request failed with status code {response.status_code}")
+                raise RuntimeError("OCR API request failed")
+    
     except Exception as e:
         logging.error(f"OCR failed: {e}")
         raise RuntimeError("OCR processing error")
-
-def parse_math_expression(text: str) -> str:
-    """Parse and extract mathematical expressions from text using SymPy."""
-    try:
-        # First try to parse the entire text
-        expr = parse_expr(text, evaluate=False)
-        return str(expr)
-    except SympifyError:
-        # If that fails, search for math patterns
-        expressions = []
-        parts = re.split(r'[.,;!?\n]', text)
-        math_pattern = r'(\d+\s*[\+\-\*/\^]\s*\d+|\d+\.\d+|\(.*\)|sqrt\(.*\)|pi|\^?[a-zA-Z]+)'
-        
-        for part in parts:
-            matches = re.findall(math_pattern, part)
-            for match in matches:
-                try:
-                    expr = parse_expr(match, evaluate=False)
-                    expressions.append(str(expr))
-                except SympifyError:
-                    continue
-        
-        return ' '.join(expressions) if expressions else text
-    except Exception as e:
-        logging.error(f"Math parsing error: {e}")
-        return text
