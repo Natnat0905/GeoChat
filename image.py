@@ -4,6 +4,8 @@ import re
 import logging
 from sympy import parse_expr, SympifyError
 
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
 def preprocess_image(image_path: str) -> Image.Image:
     """Preprocess the image to improve OCR accuracy."""
     try:
