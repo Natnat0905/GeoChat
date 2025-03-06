@@ -30,4 +30,4 @@ COPY . /app/
 EXPOSE 8080
 
 # Set the default command to run the application, use environment variable if available
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+CMD ["sh", "-c", "uvicorn visual:app --host 0.0.0.0 --port ${PORT:-8080}"]
