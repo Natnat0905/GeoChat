@@ -22,7 +22,7 @@ from sympy import sympify, SympifyError
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters)
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
-from image import (extract_text_from_image, parse_math_expression)
+from image import (extract_text_from_image)
 
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
@@ -173,22 +173,13 @@ async def tutor_endpoint(message: Message):
 async def process_image(file: UploadFile = File(...)):
     temp_path = None
     try:
-        # Validate content type
         if not file.content_type.startswith('image/'):
-            return JSONResponse(
-                content={"type": "error", "content": "Invalid file type"},
-                status_code=400
-            )
+            return JSONResponse(content={"type": "error", "content": "Invalid file type"}, status_code=400)
 
-        # Limit file size
         MAX_SIZE = 5 * 1024 * 1024  # 5MB
         if file.size > MAX_SIZE:
-            return JSONResponse(
-                content={"type": "error", "content": "File too large (max 5MB)"},
-                status_code=400
-            )
+            return JSONResponse(content={"type": "error", "content": "File too large (max 5MB)"}, status_code=400)
 
-        # Save uploaded image
         with tempfile.NamedTemporaryFile(delete=False) as temp:
             content = await file.read()
             if len(content) > MAX_SIZE:
@@ -196,28 +187,19 @@ async def process_image(file: UploadFile = File(...)):
             temp.write(content)
             temp_path = temp.name
 
-        # OCR processing
         extracted_text = extract_text_from_image(temp_path)
         logging.info(f"Extracted text: {extracted_text}")
 
-        # Math parsing
-        math_problem = parse_math_expression(extracted_text)
+        math_problem = enhance_explanation(extracted_text)
         if not math_problem:
-            return JSONResponse(
-                content={"type": "error", "content": "No math problem detected"},
-                status_code=400
-            )
+            return JSONResponse(content={"type": "error", "content": "No math problem detected"}, status_code=400)
 
-        # Get tutor response
         tutor_response = get_tutor_response(math_problem)
         return handle_tutor_response(math_problem, tutor_response)
 
     except Exception as e:
         logging.error(f"Image processing error: {str(e)}")
-        return JSONResponse(
-            content={"type": "error", "content": "Error processing image"},
-            status_code=500
-        )
+        return JSONResponse(content={"type": "error", "content": "Error processing image"}, status_code=500)
     finally:
         if temp_path and os.path.exists(temp_path):
             os.unlink(temp_path)
