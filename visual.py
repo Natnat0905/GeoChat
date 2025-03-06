@@ -24,7 +24,7 @@ from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_
 from illustration import (draw_right_triangle, plot_trigonometric_function)
 from image import (extract_text_from_image)
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
