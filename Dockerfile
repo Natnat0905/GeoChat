@@ -18,7 +18,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Copy the Procfile
+COPY Procfile /Procfile
+
 EXPOSE 8080
 
-# Use shell form to allow environment variable substitution
-ENTRYPOINT sh -c "uvicorn visual:app --host 0.0.0.0 --port $PORT"
+# Use a command to run the application from the Procfile
+CMD ["sh", "-c", "exec $(cat /Procfile | grep web | cut -d ' ' -f2-)" ]
