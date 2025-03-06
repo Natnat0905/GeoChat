@@ -16,12 +16,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Install foreman to read and run the Procfile
+RUN pip install foreman
 
-# Copy the Procfile
-COPY Procfile /Procfile
+COPY . .
 
 EXPOSE 8080
 
-# Use a command to run the application from the Procfile
-CMD ["sh", "-c", "exec $(cat /Procfile | grep web | cut -d ' ' -f2-)" ]
+# Use foreman to run the command specified in the Procfile
+CMD ["foreman", "start"]
