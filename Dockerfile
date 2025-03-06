@@ -22,5 +22,5 @@ COPY . .
 # Expose the port the app will run on
 EXPOSE 5000
 
-# Start the application
-CMD ["python", "app.py"]
+# Ensure the command properly references the environment variable for the port
+ENTRYPOINT ["sh", "-c", "uvicorn visual:app --host 0.0.0.0 --port ${PORT:-5000}"]
