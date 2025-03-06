@@ -22,9 +22,6 @@ from sympy import sympify, SympifyError
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters)
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
-from image import (extract_text_from_image)
-
-pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -169,41 +166,6 @@ async def tutor_endpoint(message: Message):
         logging.error(f"Endpoint error: {str(e)}")
         return JSONResponse(content={"type": "error", "content": "Please try rephrasing your question"}, status_code=500)
     
-@app.post("/process-image")
-async def process_image(file: UploadFile = File(...)):
-    temp_path = None
-    try:
-        if not file.content_type.startswith('image/'):
-            return JSONResponse(content={"type": "error", "content": "Invalid file type"}, status_code=400)
-
-        MAX_SIZE = 5 * 1024 * 1024  # 5MB
-        if file.size > MAX_SIZE:
-            return JSONResponse(content={"type": "error", "content": "File too large (max 5MB)"}, status_code=400)
-
-        with tempfile.NamedTemporaryFile(delete=False) as temp:
-            content = await file.read()
-            if len(content) > MAX_SIZE:
-                raise ValueError("File size exceeds limit")
-            temp.write(content)
-            temp_path = temp.name
-
-        extracted_text = extract_text_from_image(temp_path, file.content_type)  # Pass content_type
-        logging.info(f"Extracted text: {extracted_text}")
-
-        math_problem = enhance_explanation(extracted_text)
-        if not math_problem:
-            return JSONResponse(content={"type": "error", "content": "No math problem detected"}, status_code=400)
-
-        tutor_response = get_tutor_response(math_problem)
-        return handle_tutor_response(math_problem, tutor_response)
-
-    except Exception as e:
-        logging.error(f"Image processing error: {str(e)}")
-        return JSONResponse(content={"type": "error", "content": "Error processing image"}, status_code=500)
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.unlink(temp_path)
-
 def handle_tutor_response(math_problem: str, tutor_response: dict) -> JSONResponse:
     try:
         # Handle the tutor's response, which might include a visualization
