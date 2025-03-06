@@ -20,4 +20,5 @@ COPY . .
 
 EXPOSE 8080
 
-ENTRYPOINT ["sh", "-c", "uvicorn visual:app --host 0.0.0.0 --port $PORT"]
+# Use shell form to allow environment variable substitution
+ENTRYPOINT sh -c "uvicorn visual:app --host 0.0.0.0 --port $PORT"
