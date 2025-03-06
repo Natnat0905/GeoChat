@@ -20,4 +20,4 @@ COPY . .
 
 EXPOSE 8080
 
-ENTRYPOINT ["sh", "-c", "uvicorn visual:app --host 0.0.0.0 --port \"${PORT}\""]
+ENTRYPOINT ["sh", "-c", "uvicorn visual:app --host 0.0.0.0 --port $PORT"]
