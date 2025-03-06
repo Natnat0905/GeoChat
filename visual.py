@@ -187,7 +187,7 @@ async def process_image(file: UploadFile = File(...)):
             temp.write(content)
             temp_path = temp.name
 
-        extracted_text = extract_text_from_image(temp_path)
+        extracted_text = extract_text_from_image(temp_path, file.content_type)  # Pass content_type
         logging.info(f"Extracted text: {extracted_text}")
 
         math_problem = enhance_explanation(extracted_text)
