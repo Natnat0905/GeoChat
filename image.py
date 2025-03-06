@@ -3,6 +3,7 @@ from PIL import Image, ImageEnhance, ImageFilter
 import re
 import logging
 from sympy import parse_expr, SympifyError
+import os
 
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
