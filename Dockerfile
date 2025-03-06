@@ -29,6 +29,5 @@ COPY . /app/
 # Expose the port your application will run on
 EXPOSE 8080
 
-# Command to run your application
-# Use $PORT as the environment variable and fallback to 8080 if not set
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${PORT:-8080}"]
+# Set the default command to run the application, use environment variable if available
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
