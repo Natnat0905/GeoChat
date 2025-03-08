@@ -8,15 +8,25 @@ import logging
 
 TRIANGLE_NORMALIZATION_RULES = {
     "right_triangle": {
-        "required": ["leg1", "leg2"],
+        "required": ["leg1", "leg2", "hypotenuse"],
         "derived": {
             "leg1": [
+                {"source": ["hypotenuse"], 
+                 "formula": lambda h: h/2},  # 30° leg
                 {"source": ["hypotenuse", "leg2"], 
                  "formula": lambda h, l2: math.sqrt(h**2 - l2**2)}
             ],
             "leg2": [
+                {"source": ["hypotenuse"], 
+                 "formula": lambda h: (h*math.sqrt(3))/2},  # 60° leg
                 {"source": ["hypotenuse", "leg1"], 
                  "formula": lambda h, l1: math.sqrt(h**2 - l1**2)}
+            ],
+            "hypotenuse": [
+                {"source": ["leg1"], 
+                 "formula": lambda l1: l1*2},
+                {"source": ["leg2"], 
+                 "formula": lambda l2: l2*2/math.sqrt(3)}
             ]
         }
     },
@@ -67,14 +77,34 @@ def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
-    """Normalize triangle parameters using defined rules"""
+    """Enhanced normalization with angle handling"""
+    normalized = params.copy()
+    
+    if shape_type == "right_triangle":
+        # Handle special 30-60-90 case
+        angles = normalized.get("angles")
+        if angles and set(angles) == {30, 60, 90}:
+            try:
+                if "hypotenuse" in normalized:
+                    h = normalized["hypotenuse"]
+                    normalized.setdefault("leg1", h/2)
+                    normalized.setdefault("leg2", (h*math.sqrt(3))/2)
+                elif "leg1" in normalized:  # 30° leg
+                    l1 = normalized["leg1"]
+                    normalized.setdefault("hypotenuse", l1*2)
+                    normalized.setdefault("leg2", l1*math.sqrt(3))
+                elif "leg2" in normalized:  # 60° leg
+                    l2 = normalized["leg2"]
+                    normalized.setdefault("hypotenuse", l2*2/math.sqrt(3))
+                    normalized.setdefault("leg1", l2/math.sqrt(3))
+            except KeyError as e:
+                logging.warning(f"Missing parameter for 30-60-90 triangle: {e}")
+
     rules = TRIANGLE_NORMALIZATION_RULES.get(shape_type, {})
     required = rules.get("required", [])
     derived = rules.get("derived", {})
     
-    normalized = params.copy()
     attempts = 3
-    
     while attempts > 0:
         missing = [p for p in required if p not in normalized]
         if not missing:

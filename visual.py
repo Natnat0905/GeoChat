@@ -65,6 +65,11 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
   - Use "ratio" of similarity
   - Include pairs of corresponding sides
   - Example: {"shape":"similar_triangles", "parameters":{"corresponding_side1":20, "corresponding_side2":5}}
+
+- For right triangles with 30-60-90 angles:
+  - Specify hypotenuse or one leg
+  - Include angles parameter: "angles": [30, 60, 90]
+  - Example: {"shape":"right_triangle", "parameters": {"hypotenuse": 21, "angles": [30,60,90]}
 """
 
 SHAPE_NORMALIZATION_RULES = {
@@ -90,22 +95,18 @@ def enhance_explanation(response: str) -> str:
 
 def safe_eval_parameter(value: Any) -> Optional[float]:
     """Safely evaluate mathematical expressions with π support, handling both strings and numbers."""
+    if isinstance(value, list):
+        return None  # Special handling in normalization
     try:
-        # If the value is already a number (int or float), return it directly
         if isinstance(value, (int, float)):
             return float(value)
-
-        # Ensure value is a string before calling .strip()
         if not isinstance(value, str) or value.strip() == "":
-            return None  # Return None for invalid values
-
-        # Replace π with math.pi and handle exponents
+            return None
         expr = value.lower().replace('π', 'math.pi').replace('^', '**')
         return eval(expr, {"__builtins__": None}, {"math": math})
-
     except Exception as e:
         logging.error(f"Parameter evaluation failed: {value} -> {e}")
-        return None  # Return None for invalid cases
+        return None
 
 def get_tutor_response(user_message: str) -> dict:
     try:
@@ -236,7 +237,7 @@ def handle_visualization(data: dict) -> JSONResponse:
         visualization_mapping = {
             "circle": (draw_circle, ["radius"]),  # Ensure only 'radius' is passed for circles
             "rectangle": (draw_rectangle, ["width", "height"]),
-            "right_triangle": (draw_right_triangle, ["leg1", "leg2"]),
+            "right_triangle": (draw_right_triangle, ["leg1", "leg2", "hypotenuse"]),
             "trigonometric": (plot_trigonometric_function, ["function"]),
             "similar_triangles": (draw_similar_triangles, ["ratio", "corresponding_side1", "corresponding_side2"])
         }
