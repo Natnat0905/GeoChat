@@ -103,36 +103,49 @@ def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
-    """Enhanced normalization with trigonometric support"""
+    """Enhanced normalization with angle validation and parameter handling"""
     normalized = params.copy()
     
     if shape_type == "right_triangle":
         # Convert legacy parameter names
-        if 'leg1' in normalized:
-            normalized['side1'] = normalized.pop('leg1')
-        if 'leg2' in normalized:
-            normalized['side2'] = normalized.pop('leg2')
+        normalized = {k.replace('leg', 'side'): v for k, v in normalized.items()}
+        
+        # Validate and process angles
         angles = normalized.get("angles", [])
-        if 90 in angles and len(angles) == 2:
+        if 90 in angles:
             try:
-                non_right_angle = [a for a in angles if a != 90][0]
-                normalized["angle"] = non_right_angle
+                # Calculate third angle if needed
+                if len(angles) == 2:
+                    angles.append(90)
+                    angles = list(set(angles))  # Remove duplicate 90 if present
+                    angles.append(180 - sum(angles))
                 
+                # Get non-right angles
+                non_right_angles = [a for a in angles if a != 90]
+                if sum(non_right_angles) != 90:
+                    raise ValueError("Invalid right triangle angles")
+                
+                angle = non_right_angles[0]  # Use first non-right angle for calculations
+                normalized["angle"] = angle
+
+                # Calculate missing sides
                 if "side1" in normalized:
                     s1 = normalized["side1"]
-                    normalized.setdefault("side2", s1 / math.tan(math.radians(non_right_angle)))
-                    normalized.setdefault("hypotenuse", s1 / math.sin(math.radians(non_right_angle)))
+                    normalized["side2"] = s1 / math.tan(math.radians(angle))
+                    normalized["hypotenuse"] = s1 / math.sin(math.radians(angle))
                 elif "side2" in normalized:
                     s2 = normalized["side2"]
-                    normalized.setdefault("side1", s2 * math.tan(math.radians(non_right_angle)))
-                    normalized.setdefault("hypotenuse", s2 / math.cos(math.radians(non_right_angle)))
+                    normalized["side1"] = s2 * math.tan(math.radians(angle))
+                    normalized["hypotenuse"] = s2 / math.cos(math.radians(angle))
                 elif "hypotenuse" in normalized:
                     h = normalized["hypotenuse"]
-                    normalized.setdefault("side1", h * math.sin(math.radians(non_right_angle)))
-                    normalized.setdefault("side2", h * math.cos(math.radians(non_right_angle)))
-            except Exception as e:
-                logging.error(f"Trig calculation error: {e}")
+                    normalized["side1"] = h * math.sin(math.radians(angle))
+                    normalized["side2"] = h * math.cos(math.radians(angle))
+                    
+            except (IndexError, ValueError) as e:
+                logging.error(f"Angle validation failed: {e}")
 
+    # Existing normalization logic
     rules = TRIANGLE_NORMALIZATION_RULES.get(shape_type, {})
     required = rules.get("required", [])
     derived = rules.get("derived", {})

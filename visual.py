@@ -245,9 +245,9 @@ def handle_visualization(data: dict) -> JSONResponse:
             return JSONResponse(content={"type": "error", "content": "Invalid parameters for drawing."}, status_code=400)
 
         visualization_mapping = {
-            "circle": (draw_circle, ["radius"]),  # Ensure only 'radius' is passed for circles
+            "circle": (draw_circle, ["radius"]),
             "rectangle": (draw_rectangle, ["width", "height"]),
-            "right_triangle": (draw_right_triangle, ["leg1", "leg2", "hypotenuse"]),
+            "right_triangle": (draw_right_triangle, ["side1", "side2", "hypotenuse"]),  # Updated parameter names
             "trigonometric": (plot_trigonometric_function, ["function"]),
             "similar_triangles": (draw_similar_triangles, ["ratio", "corresponding_side1", "corresponding_side2"])
         }
