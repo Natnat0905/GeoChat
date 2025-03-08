@@ -8,25 +8,25 @@ import logging
 
 TRIANGLE_NORMALIZATION_RULES = {
     "right_triangle": {
-        "required": ["leg1", "leg2", "hypotenuse"],
+        "required": ["side1", "side2", "hypotenuse"],
         "derived": {
-            "leg1": [
-                {"source": ["hypotenuse"], 
-                 "formula": lambda h: h/2},  # 30° leg
-                {"source": ["hypotenuse", "leg2"], 
-                 "formula": lambda h, l2: math.sqrt(h**2 - l2**2)}
+            "side1": [
+                {"source": ["hypotenuse", "angle"], 
+                 "formula": lambda h, a: h * math.sin(math.radians(a))},
+                {"source": ["side2", "angle"], 
+                 "formula": lambda s2, a: s2 * math.tan(math.radians(a))}
             ],
-            "leg2": [
-                {"source": ["hypotenuse"], 
-                 "formula": lambda h: (h*math.sqrt(3))/2},  # 60° leg
-                {"source": ["hypotenuse", "leg1"], 
-                 "formula": lambda h, l1: math.sqrt(h**2 - l1**2)}
+            "side2": [
+                {"source": ["hypotenuse", "angle"], 
+                 "formula": lambda h, a: h * math.cos(math.radians(a))},
+                {"source": ["side1", "angle"], 
+                 "formula": lambda s1, a: s1 / math.tan(math.radians(a))}
             ],
             "hypotenuse": [
-                {"source": ["leg1"], 
-                 "formula": lambda l1: l1*2},
-                {"source": ["leg2"], 
-                 "formula": lambda l2: l2*2/math.sqrt(3)}
+                {"source": ["side1", "angle"], 
+                 "formula": lambda s, a: s / math.sin(math.radians(a))},
+                {"source": ["side2", "angle"], 
+                 "formula": lambda s, a: s / math.cos(math.radians(a))}
             ]
         }
     },
@@ -77,28 +77,30 @@ def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
-    """Enhanced normalization with angle handling"""
+    """Enhanced normalization with trigonometric support"""
     normalized = params.copy()
     
     if shape_type == "right_triangle":
-        # Handle special 30-60-90 case
-        angles = normalized.get("angles")
-        if angles and set(angles) == {30, 60, 90}:
+        angles = normalized.get("angles", [])
+        if 90 in angles and len(angles) == 2:
             try:
-                if "hypotenuse" in normalized:
+                non_right_angle = [a for a in angles if a != 90][0]
+                normalized["angle"] = non_right_angle
+                
+                if "side1" in normalized:
+                    s1 = normalized["side1"]
+                    normalized.setdefault("side2", s1 / math.tan(math.radians(non_right_angle)))
+                    normalized.setdefault("hypotenuse", s1 / math.sin(math.radians(non_right_angle)))
+                elif "side2" in normalized:
+                    s2 = normalized["side2"]
+                    normalized.setdefault("side1", s2 * math.tan(math.radians(non_right_angle)))
+                    normalized.setdefault("hypotenuse", s2 / math.cos(math.radians(non_right_angle)))
+                elif "hypotenuse" in normalized:
                     h = normalized["hypotenuse"]
-                    normalized.setdefault("leg1", h/2)
-                    normalized.setdefault("leg2", (h*math.sqrt(3))/2)
-                elif "leg1" in normalized:  # 30° leg
-                    l1 = normalized["leg1"]
-                    normalized.setdefault("hypotenuse", l1*2)
-                    normalized.setdefault("leg2", l1*math.sqrt(3))
-                elif "leg2" in normalized:  # 60° leg
-                    l2 = normalized["leg2"]
-                    normalized.setdefault("hypotenuse", l2*2/math.sqrt(3))
-                    normalized.setdefault("leg1", l2/math.sqrt(3))
-            except KeyError as e:
-                logging.warning(f"Missing parameter for 30-60-90 triangle: {e}")
+                    normalized.setdefault("side1", h * math.sin(math.radians(non_right_angle)))
+                    normalized.setdefault("side2", h * math.cos(math.radians(non_right_angle)))
+            except Exception as e:
+                logging.error(f"Trig calculation error: {e}")
 
     rules = TRIANGLE_NORMALIZATION_RULES.get(shape_type, {})
     required = rules.get("required", [])

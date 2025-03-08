@@ -70,6 +70,11 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
   - Specify hypotenuse or one leg
   - Include angles parameter: "angles": [30, 60, 90]
   - Example: {"shape":"right_triangle", "parameters": {"hypotenuse": 21, "angles": [30,60,90]}
+
+- For right triangles with any angles:
+  - Specify at least one side and the non-right angles
+  - Include angles parameter: "angles": [90, x, y]
+  - Example: {"shape":"right_triangle", "parameters": {"side1": 4, "angles": [90, 40, 50]}
 """
 
 SHAPE_NORMALIZATION_RULES = {
