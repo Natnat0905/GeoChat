@@ -22,7 +22,7 @@ from sympy import sympify, SympifyError
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters)
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
-from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters
+from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle
 
 
 app = FastAPI()
@@ -74,6 +74,11 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 - For right triangles with any angles:
   - Specify at least one side and the non-right angles
   - Include angles parameter: "angles": [90, x, y]
+  - Example: {"shape":"right_triangle", "parameters": {"side1": 4, "angles": [90, 40, 50]}
+
+- For right triangles with any angles:
+  - Use parameters: side1, side2, hypotenuse
+  - Specify at least one side and angles
   - Example: {"shape":"right_triangle", "parameters": {"side1": 4, "angles": [90, 40, 50]}
 """
 
