@@ -41,39 +41,30 @@ TRIANGLE_NORMALIZATION_RULES = {
     }
 }
 
-def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
-    """Draw two similar triangles with labeled sides and similarity ratio"""
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.set_aspect('equal')
-    plt.axis('off')
+# illustration.py
+def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
+    """Draw right triangle with automatic orientation"""
+    # Determine triangle orientation
+    base = max(side1, side2)
+    height = min(side1, side2)
     
-    # Draw first triangle (ΔABC)
-    triangle1 = Polygon(
-        [[0, 0], [side1, 0], [0, side1*0.6]],
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.set_aspect('equal')
+    
+    triangle = plt.Polygon(
+        [[0, 0], [base, 0], [0, height]],
         closed=True, fill=None, edgecolor='blue', linewidth=2
     )
-    ax.add_patch(triangle1)
+    ax.add_patch(triangle)
     
-    # Draw second similar triangle (ΔDEF)
-    triangle2 = Polygon(
-        [[side1 + 2, 0], 
-         [side1 + 2 + side2, 0], 
-         [side1 + 2, side2 * 0.6 * ratio]],
-        closed=True, fill=None, edgecolor='red', linewidth=2
-    )
-    ax.add_patch(triangle2)
+    # Label sides
+    plt.text(base/2, -0.8, f'{base:.2f}', ha='center')
+    plt.text(-0.8, height/2, f'{height:.2f}', va='center')
+    plt.text(base/2, height/2, f'{hypotenuse:.2f}', ha='center', color='red')
     
-    # Add labels and annotations
-    plt.text(side1/2, -0.8, f'AB = {side1}', ha='center', fontsize=10)
-    plt.text(side1 + 2 + side2/2, -0.8, f'DE = {side2}', ha='center', fontsize=10)
-    plt.text((side1 + side1 + 2)/2, max(side1*0.6, side2*0.6*ratio)/2,
-             f'Similarity Ratio: {ratio:.2f}:1', ha='center', va='center',
-             fontsize=12, color='purple')
-    
-    # Save to base64
     buf = BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
-    plt.close(fig)
+    plt.savefig(buf, format='png', bbox_inches='tight')
+    plt.close()
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
@@ -81,6 +72,11 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     normalized = params.copy()
     
     if shape_type == "right_triangle":
+        # Convert legacy parameter names
+        if 'leg1' in normalized:
+            normalized['side1'] = normalized.pop('leg1')
+        if 'leg2' in normalized:
+            normalized['side2'] = normalized.pop('leg2')
         angles = normalized.get("angles", [])
         if 90 in angles and len(angles) == 2:
             try:
