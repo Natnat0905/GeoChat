@@ -22,6 +22,8 @@ from sympy import sympify, SympifyError
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters)
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
+from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters
+
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -58,30 +60,22 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 - Example square: {"shape":"rectangle", "parameters":{"side":5}}
 - Example rectangle: {"shape":"rectangle", "parameters":{"area":20, "height":4}}
 - Always include units in explanation but NOT in parameters
+
+- For similar triangles:
+  - Use "ratio" of similarity
+  - Include pairs of corresponding sides
+  - Example: {"shape":"similar_triangles", "parameters":{"corresponding_side1":20, "corresponding_side2":5}}
 """
 
 SHAPE_NORMALIZATION_RULES = {
-    "right_triangle": {
-        "required": ["leg1", "leg2"],
-        "derived": {
-            "leg1": [
-                {"source": ["hypotenuse", "leg2"], 
-                 "formula": lambda h, l2: math.sqrt(h**2 - l2**2)}
-            ],
-            "leg2": [
-                {"source": ["hypotenuse", "leg1"], 
-                 "formula": lambda h, l1: math.sqrt(h**2 - l1**2)}
-            ]
-        }
-    },
     "trigonometric": {
         "required": ["function"],
         "derived": {}
     }
 }
-
-# Merge circle rules into SHAPE_NORMALIZATION_RULES dynamically
+SHAPE_NORMALIZATION_RULES.update(TRIANGLE_NORMALIZATION_RULES)
 SHAPE_NORMALIZATION_RULES["circle"] = CIRCLE_NORMALIZATION_RULES
+
 
 def enhance_explanation(response: str) -> str:
     replacements = {
@@ -188,11 +182,12 @@ def handle_tutor_response(math_problem: str, tutor_response: dict) -> JSONRespon
 def normalize_parameters(shape: str, params: Dict[str, float]) -> Dict[str, float]:
     """Normalize parameters to required values using defined rules"""
     
-    if shape == "rectangle":  # Check for squares
-        params = normalize_square_parameters(params)  # This modifies params correctly
-
-    elif shape == "circle":  
-        params = normalize_circle_parameters(params)  # Convert circles
+    if shape in TRIANGLE_NORMALIZATION_RULES:
+        params = normalize_triangle_parameters(shape, params)
+    elif shape == "rectangle":
+        params = normalize_square_parameters(params)
+    elif shape == "circle":
+        params = normalize_circle_parameters(params)
 
     rules = SHAPE_NORMALIZATION_RULES.get(shape, {})
     required = rules.get("required", [])
@@ -242,7 +237,8 @@ def handle_visualization(data: dict) -> JSONResponse:
             "circle": (draw_circle, ["radius"]),  # Ensure only 'radius' is passed for circles
             "rectangle": (draw_rectangle, ["width", "height"]),
             "right_triangle": (draw_right_triangle, ["leg1", "leg2"]),
-            "trigonometric": (plot_trigonometric_function, ["function"])
+            "trigonometric": (plot_trigonometric_function, ["function"]),
+            "similar_triangles": (draw_similar_triangles, ["ratio", "corresponding_side1", "corresponding_side2"])
         }
 
         if shape not in visualization_mapping:

@@ -1,87 +1,95 @@
 # triangle.py
-
-import matplotlib.pyplot as plt
-import numpy as np
 import math
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+from io import BytesIO
 import base64
-import io
+import logging
 
-def generate_image(fig) -> str:
-    """Convert matplotlib figure to base64 encoded PNG"""
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-    buf.seek(0)
+TRIANGLE_NORMALIZATION_RULES = {
+    "right_triangle": {
+        "required": ["leg1", "leg2"],
+        "derived": {
+            "leg1": [
+                {"source": ["hypotenuse", "leg2"], 
+                 "formula": lambda h, l2: math.sqrt(h**2 - l2**2)}
+            ],
+            "leg2": [
+                {"source": ["hypotenuse", "leg1"], 
+                 "formula": lambda h, l1: math.sqrt(h**2 - l1**2)}
+            ]
+        }
+    },
+    "similar_triangles": {
+        "required": ["ratio", "corresponding_side1", "corresponding_side2"],
+        "derived": {
+            "ratio": [
+                {"source": ["corresponding_side1", "corresponding_side2"],
+                 "formula": lambda s1, s2: s1/s2}
+            ]
+        }
+    }
+}
+
+def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
+    """Draw two similar triangles with labeled sides and similarity ratio"""
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.set_aspect('equal')
+    plt.axis('off')
+    
+    # Draw first triangle (ΔABC)
+    triangle1 = Polygon(
+        [[0, 0], [side1, 0], [0, side1*0.6]],
+        closed=True, fill=None, edgecolor='blue', linewidth=2
+    )
+    ax.add_patch(triangle1)
+    
+    # Draw second similar triangle (ΔDEF)
+    triangle2 = Polygon(
+        [[side1 + 2, 0], 
+         [side1 + 2 + side2, 0], 
+         [side1 + 2, side2 * 0.6 * ratio]],
+        closed=True, fill=None, edgecolor='red', linewidth=2
+    )
+    ax.add_patch(triangle2)
+    
+    # Add labels and annotations
+    plt.text(side1/2, -0.8, f'AB = {side1}', ha='center', fontsize=10)
+    plt.text(side1 + 2 + side2/2, -0.8, f'DE = {side2}', ha='center', fontsize=10)
+    plt.text((side1 + side1 + 2)/2, max(side1*0.6, side2*0.6*ratio)/2,
+             f'Similarity Ratio: {ratio:.2f}:1', ha='center', va='center',
+             fontsize=12, color='purple')
+    
+    # Save to base64
+    buf = BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
     plt.close(fig)
-    return "data:image/png;base64," + base64.b64encode(buf.read()).decode('utf-8')
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
-def draw_equilateral_triangle(side: float) -> str:
-    """Generate equilateral triangle visualization"""
-    fig, ax = plt.subplots(figsize=(6, 6))
+def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
+    """Normalize triangle parameters using defined rules"""
+    rules = TRIANGLE_NORMALIZATION_RULES.get(shape_type, {})
+    required = rules.get("required", [])
+    derived = rules.get("derived", {})
     
-    # Equilateral triangle vertices
-    height = (math.sqrt(3) / 2) * side
-    vertices = np.array([[0, 0], [side, 0], [side / 2, height], [0, 0]])
-
-    # Plot triangle
-    ax.plot(vertices[:, 0], vertices[:, 1], label=f'Side = {side} cm', color='b', lw=2)
-    ax.fill(vertices[:, 0], vertices[:, 1], 'b', alpha=0.1)
-
-    # Annotate the sides
-    ax.text(side / 2, height / 2, f'{side} cm', ha='center', fontsize=10, color='r')
-
-    ax.set_aspect('equal')
-    ax.set_title("Equilateral Triangle Visualization", pad=20)
-    ax.set_xlabel("Centimeters (cm)", labelpad=10)
-    ax.set_ylabel("Centimeters (cm)", labelpad=10)
-    ax.grid(True, linestyle='--', alpha=0.7)
-
-    return generate_image(fig)
-
-def draw_isosceles_triangle(base: float, equal_side: float) -> str:
-    """Generate isosceles triangle visualization"""
-    fig, ax = plt.subplots(figsize=(6, 6))
+    normalized = params.copy()
+    attempts = 3
     
-    # Isosceles triangle vertices
-    height = math.sqrt(equal_side**2 - (base / 2)**2)
-    vertices = np.array([[0, 0], [base, 0], [base / 2, height], [0, 0]])
-
-    # Plot triangle
-    ax.plot(vertices[:, 0], vertices[:, 1], label=f'Base = {base} cm, Side = {equal_side} cm', color='g', lw=2)
-    ax.fill(vertices[:, 0], vertices[:, 1], 'g', alpha=0.1)
-
-    # Annotate the sides
-    ax.text(base / 2, height / 2, f'{equal_side} cm', ha='center', fontsize=10, color='r')
-
-    ax.set_aspect('equal')
-    ax.set_title("Isosceles Triangle Visualization", pad=20)
-    ax.set_xlabel("Centimeters (cm)", labelpad=10)
-    ax.set_ylabel("Centimeters (cm)", labelpad=10)
-    ax.grid(True, linestyle='--', alpha=0.7)
-
-    return generate_image(fig)
-
-def draw_scalene_triangle(side1: float, side2: float, side3: float) -> str:
-    """Generate scalene triangle visualization"""
-    fig, ax = plt.subplots(figsize=(6, 6))
-    
-    # Using Heron's formula to calculate the height
-    s = (side1 + side2 + side3) / 2  # semi-perimeter
-    height = 2 * math.sqrt(s * (s - side1) * (s - side2) * (s - side3)) / side1
-
-    # Scalene triangle vertices (simplified, can be adjusted for more accuracy)
-    vertices = np.array([[0, 0], [side1, 0], [side2 / 2, height], [0, 0]])
-
-    # Plot triangle
-    ax.plot(vertices[:, 0], vertices[:, 1], label=f'Sides = {side1}, {side2}, {side3}', color='r', lw=2)
-    ax.fill(vertices[:, 0], vertices[:, 1], 'r', alpha=0.1)
-
-    # Annotate the sides
-    ax.text(side2 / 4, height / 2, f'{side2} cm', ha='center', fontsize=10, color='b')
-
-    ax.set_aspect('equal')
-    ax.set_title("Scalene Triangle Visualization", pad=20)
-    ax.set_xlabel("Centimeters (cm)", labelpad=10)
-    ax.set_ylabel("Centimeters (cm)", labelpad=10)
-    ax.grid(True, linestyle='--', alpha=0.7)
-
-    return generate_image(fig)
+    while attempts > 0:
+        missing = [p for p in required if p not in normalized]
+        if not missing:
+            break
+            
+        for param in missing:
+            for formula in derived.get(param, []):
+                if all(s in normalized for s in formula["source"]):
+                    try:
+                        result = formula["formula"](*[normalized[s] for s in formula["source"]])
+                        if result is not None:
+                            normalized[param] = result
+                            break
+                    except Exception as e:
+                        logging.warning(f"Formula failed for {param}: {e}")
+        attempts -= 1
+        
+    return normalized
