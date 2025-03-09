@@ -52,33 +52,58 @@ TRIANGLE_NORMALIZATION_RULES = {
     }
 }
 
+# triangle.py
 def draw_equilateral_triangle(side: float) -> str:
-    """Draw an equilateral triangle with labeled sides and height"""
-    fig, ax = plt.subplots(figsize=(6, 6))
+    """Draw an equilateral triangle with proper scaling and labels"""
+    fig, ax = plt.subplots(figsize=(7, 7))
     ax.set_aspect('equal')
     
-    # Calculate height
+    # Calculate triangle properties
     height = (math.sqrt(3)/2) * side
+    area = (math.sqrt(3)/4) * side**2
+    
+    # Create triangle coordinates
+    vertices = [
+        [0, 0],
+        [side, 0],
+        [side/2, height]
+    ]
     
     # Draw triangle
-    triangle = Polygon(
-        [[0, 0], [side, 0], [side/2, height]],
-        closed=True, fill=None, edgecolor='blue', linewidth=2
-    )
+    triangle = Polygon(vertices, closed=True, fill=None, 
+                      edgecolor='blue', linewidth=2)
     ax.add_patch(triangle)
     
-    # Label sides and height
-    plt.text(side/2, -0.5, f'Side: {side} cm', ha='center')
-    plt.text(side/4, height/2, f'Height: {height:.2f} cm', 
-             rotation=60, ha='center', va='center')
-    plt.text(3*side/4, height/2, f'Area: {(math.sqrt(3)/4)*side**2:.2f} cm²',
-             rotation=-60, ha='center', va='center')
+    # Set axis limits with padding
+    padding = side * 0.2
+    ax.set_xlim(-padding, side + padding)
+    ax.set_ylim(-padding, height + padding)
     
-    # Set axis limits
-    ax.set_xlim(-1, side+1)
-    ax.set_ylim(-1, height+1)
-    plt.axis('off')
+    # Add grid and axes
+    ax.grid(True, linestyle='--', linewidth=0.5)
+    ax.axhline(0, color='black', linewidth=0.8)
+    ax.axvline(0, color='black', linewidth=0.8)
     
+    # Add labels with proper positioning
+    ax.text(side/2, -padding/2, f'Side: {side} cm', 
+           ha='center', va='top', color='green')
+    
+    # Height label
+    ax.annotate(f'Height: {height:.2f} cm', 
+                xy=(side/2, height/2), xytext=(-padding, height/2),
+                arrowprops=dict(arrowstyle="->", color='red'),
+                ha='right', va='center', color='red')
+    
+    # Area label
+    ax.text(side/2, height + padding/2, 
+           f'Area = (√3/4) × {side}² = {area:.2f} cm²',
+           ha='center', va='bottom', 
+           bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
+    
+    # Add title
+    ax.set_title(f"Equilateral Triangle (Side {side} cm)", pad=15)
+    
+    # Save to base64
     buf = BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight')
     plt.close()
