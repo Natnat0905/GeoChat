@@ -22,7 +22,7 @@ from sympy import sympify, SympifyError
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters, draw_circle_angle)
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
-from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle
+from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle, draw_equilateral_triangle
 
 
 app = FastAPI()
@@ -84,6 +84,10 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 - For circle intersection angles:
   - Specify both intercepted arcs
   - Example: {"shape":"circle_angle", "parameters": {"arc1": 120, "arc2": 50}}
+
+- For equilateral triangles:
+  - Specify side length
+  - Example: {"shape":"equilateral_triangle", "parameters": {"side": 5}}
 """
 
 SHAPE_NORMALIZATION_RULES = {
@@ -254,7 +258,8 @@ def handle_visualization(data: dict) -> JSONResponse:
             "rectangle": (draw_rectangle, ["width", "height"]),
             "right_triangle": (draw_right_triangle, ["side1", "side2", "hypotenuse"]),  # Updated parameter names
             "trigonometric": (plot_trigonometric_function, ["function"]),
-            "similar_triangles": (draw_similar_triangles, ["ratio", "corresponding_side1", "corresponding_side2"])
+            "similar_triangles": (draw_similar_triangles, ["ratio", "corresponding_side1", "corresponding_side2"]),
+            "equilateral_triangle": (draw_equilateral_triangle, ["side"])
         }
 
         if shape not in visualization_mapping:

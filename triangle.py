@@ -30,6 +30,17 @@ TRIANGLE_NORMALIZATION_RULES = {
             ]
         }
     },
+    "equilateral_triangle": {
+        "required": ["side"],
+        "derived": {
+            "height": [{"source": ["side"], "formula": lambda s: (math.sqrt(3)/2)*s}],
+            "area": [{"source": ["side"], "formula": lambda s: (math.sqrt(3)/4)*s**2}],
+            "side": [
+                {"source": ["height"], "formula": lambda h: (2*h)/math.sqrt(3)},
+                {"source": ["area"], "formula": lambda a: math.sqrt((4*a)/math.sqrt(3))}
+            ]
+        }
+    },
     "similar_triangles": {
         "required": ["ratio", "corresponding_side1", "corresponding_side2"],
         "derived": {
@@ -40,6 +51,62 @@ TRIANGLE_NORMALIZATION_RULES = {
         }
     }
 }
+
+def draw_equilateral_triangle(side: float) -> str:
+    """Draw an equilateral triangle with labeled sides and height"""
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.set_aspect('equal')
+    
+    # Calculate height
+    height = (math.sqrt(3)/2) * side
+    
+    # Draw triangle
+    triangle = Polygon(
+        [[0, 0], [side, 0], [side/2, height]],
+        closed=True, fill=None, edgecolor='blue', linewidth=2
+    )
+    ax.add_patch(triangle)
+    
+    # Label sides and height
+    plt.text(side/2, -0.5, f'Side: {side} cm', ha='center')
+    plt.text(side/4, height/2, f'Height: {height:.2f} cm', 
+             rotation=60, ha='center', va='center')
+    plt.text(3*side/4, height/2, f'Area: {(math.sqrt(3)/4)*side**2:.2f} cm²',
+             rotation=-60, ha='center', va='center')
+    
+    # Set axis limits
+    ax.set_xlim(-1, side+1)
+    ax.set_ylim(-1, height+1)
+    plt.axis('off')
+    
+    buf = BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight')
+    plt.close()
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+
+def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
+    """Draw right triangle with automatic orientation"""
+    base = max(side1, side2)
+    height = min(side1, side2)
+    
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.set_aspect('equal')
+    
+    triangle = Polygon(
+        [[0, 0], [base, 0], [0, height]],
+        closed=True, fill=None, edgecolor='blue', linewidth=2
+    )
+    ax.add_patch(triangle)
+    
+    plt.text(base/2, -0.8, f'{base:.2f} cm', ha='center')
+    plt.text(-0.8, height/2, f'{height:.2f} cm', va='center')
+    plt.text(base/2, height/2, f'{hypotenuse:.2f} cm', 
+             ha='center', color='red')
+    
+    buf = BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight')
+    plt.close()
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
     """Draw two similar triangles with labeled sides and similarity ratio"""
@@ -102,50 +169,45 @@ def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
     plt.close()
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
+
 def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
-    """Enhanced normalization with angle validation and parameter handling"""
+    """Enhanced normalization with parameter conversion and validation"""
     normalized = params.copy()
     
-    if shape_type == "right_triangle":
-        # Convert legacy parameter names
-        normalized = {k.replace('leg', 'side'): v for k, v in normalized.items()}
+    # Convert legacy parameter names
+    if 'leg1' in normalized:
+        normalized['side1'] = normalized.pop('leg1')
+    if 'leg2' in normalized:
+        normalized['side2'] = normalized.pop('leg2')
         
-        # Validate and process angles
+    # Handle equilateral triangle conversions
+    if shape_type == "equilateral_triangle":
+        if "height" in normalized:
+            normalized["side"] = (2 * normalized["height"]) / math.sqrt(3)
+        elif "area" in normalized:
+            normalized["side"] = math.sqrt((4 * normalized["area"]) / math.sqrt(3))
+    
+    # Handle right triangle angles
+    if shape_type == "right_triangle":
         angles = normalized.get("angles", [])
         if 90 in angles:
-            try:
-                # Calculate third angle if needed
-                if len(angles) == 2:
-                    angles.append(90)
-                    angles = list(set(angles))  # Remove duplicate 90 if present
-                    angles.append(180 - sum(angles))
-                
-                # Get non-right angles
-                non_right_angles = [a for a in angles if a != 90]
-                if sum(non_right_angles) != 90:
-                    raise ValueError("Invalid right triangle angles")
-                
-                angle = non_right_angles[0]  # Use first non-right angle for calculations
-                normalized["angle"] = angle
-
-                # Calculate missing sides
+            non_right_angles = [a for a in angles if a != 90]
+            if non_right_angles:
+                angle = non_right_angles[0]
                 if "side1" in normalized:
-                    s1 = normalized["side1"]
-                    normalized["side2"] = s1 / math.tan(math.radians(angle))
-                    normalized["hypotenuse"] = s1 / math.sin(math.radians(angle))
+                    s = normalized["side1"]
+                    normalized.setdefault("side2", s / math.tan(math.radians(angle)))
+                    normalized.setdefault("hypotenuse", s / math.sin(math.radians(angle)))
                 elif "side2" in normalized:
-                    s2 = normalized["side2"]
-                    normalized["side1"] = s2 * math.tan(math.radians(angle))
-                    normalized["hypotenuse"] = s2 / math.cos(math.radians(angle))
+                    s = normalized["side2"]
+                    normalized.setdefault("side1", s * math.tan(math.radians(angle)))
+                    normalized.setdefault("hypotenuse", s / math.cos(math.radians(angle)))
                 elif "hypotenuse" in normalized:
                     h = normalized["hypotenuse"]
-                    normalized["side1"] = h * math.sin(math.radians(angle))
-                    normalized["side2"] = h * math.cos(math.radians(angle))
-                    
-            except (IndexError, ValueError) as e:
-                logging.error(f"Angle validation failed: {e}")
+                    normalized.setdefault("side1", h * math.sin(math.radians(angle)))
+                    normalized.setdefault("side2", h * math.cos(math.radians(angle)))
 
-    # Existing normalization logic
+    # Apply normalization rules
     rules = TRIANGLE_NORMALIZATION_RULES.get(shape_type, {})
     required = rules.get("required", [])
     derived = rules.get("derived", {})
@@ -161,11 +223,10 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
                 if all(s in normalized for s in formula["source"]):
                     try:
                         result = formula["formula"](*[normalized[s] for s in formula["source"]])
-                        if result is not None:
-                            normalized[param] = result
-                            break
+                        normalized[param] = result
+                        break
                     except Exception as e:
-                        logging.warning(f"Formula failed for {param}: {e}")
+                        logging.warning(f"Formula failed: {e}")
         attempts -= 1
         
     return normalized
