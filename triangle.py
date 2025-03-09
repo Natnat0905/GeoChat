@@ -92,13 +92,6 @@ def draw_equilateral_triangle(side: float) -> str:
     ax.text(3*side/4, height/2, f'{side} cm',             # Right side
            rotation=-60, ha='left', va='center', color='green')
     
-    # Height label with arrow outside triangle
-    ax.annotate(f'Height: {height:.2f} cm',
-                xy=(x_center, y_center), 
-                xytext=(-padding/2, y_center),
-                arrowprops=dict(arrowstyle="->", color='red'),
-                ha='right', va='center', color='red')
-    
     # Area label above triangle
     ax.text(x_center, height + padding/3, 
            f'Area = (√3/4) × {side}² = {(math.sqrt(3)/4)*side**2:.2f} cm²',
