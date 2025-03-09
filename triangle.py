@@ -52,21 +52,21 @@ TRIANGLE_NORMALIZATION_RULES = {
     }
 }
 
-# triangle.py
 def draw_equilateral_triangle(side: float) -> str:
-    """Draw an equilateral triangle with proper scaling and labels"""
+    """Draw an equilateral triangle with clear labeling of all equal sides"""
     fig, ax = plt.subplots(figsize=(7, 7))
     ax.set_aspect('equal')
     
     # Calculate triangle properties
     height = (math.sqrt(3)/2) * side
-    area = (math.sqrt(3)/4) * side**2
+    x_center = side/2
+    y_center = height/2
     
     # Create triangle coordinates
     vertices = [
-        [0, 0],
-        [side, 0],
-        [side/2, height]
+        [0, 0],          # Left vertex
+        [side, 0],        # Right vertex
+        [side/2, height]  # Top vertex
     ]
     
     # Draw triangle
@@ -84,24 +84,29 @@ def draw_equilateral_triangle(side: float) -> str:
     ax.axhline(0, color='black', linewidth=0.8)
     ax.axvline(0, color='black', linewidth=0.8)
     
-    # Add labels with proper positioning
-    ax.text(side/2, -padding/2, f'Side: {side} cm', 
+    # Label all three equal sides
+    ax.text(side/2, -padding/2, f'All sides: {side} cm',  # Base
            ha='center', va='top', color='green')
+    ax.text(side/4, height/2, f'{side} cm',               # Left side
+           rotation=60, ha='right', va='center', color='green')
+    ax.text(3*side/4, height/2, f'{side} cm',             # Right side
+           rotation=-60, ha='left', va='center', color='green')
     
-    # Height label
-    ax.annotate(f'Height: {height:.2f} cm', 
-                xy=(side/2, height/2), xytext=(-padding, height/2),
+    # Height label with arrow outside triangle
+    ax.annotate(f'Height: {height:.2f} cm',
+                xy=(x_center, y_center), 
+                xytext=(-padding/2, y_center),
                 arrowprops=dict(arrowstyle="->", color='red'),
                 ha='right', va='center', color='red')
     
-    # Area label
-    ax.text(side/2, height + padding/2, 
-           f'Area = (√3/4) × {side}² = {area:.2f} cm²',
+    # Area label above triangle
+    ax.text(x_center, height + padding/3, 
+           f'Area = (√3/4) × {side}² = {(math.sqrt(3)/4)*side**2:.2f} cm²',
            ha='center', va='bottom', 
            bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
     
     # Add title
-    ax.set_title(f"Equilateral Triangle (Side {side} cm)", pad=15)
+    ax.set_title(f"Equilateral Triangle (All sides = {side} cm)", pad=15)
     
     # Save to base64
     buf = BytesIO()
