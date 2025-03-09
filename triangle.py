@@ -7,26 +7,32 @@ import base64
 import logging
 
 TRIANGLE_NORMALIZATION_RULES = {
-    "right_triangle": {
+   "right_triangle": {
         "required": ["side1", "side2", "hypotenuse"],
         "derived": {
             "side1": [
                 {"source": ["hypotenuse", "angle"], 
                  "formula": lambda h, a: h * math.sin(math.radians(a))},
                 {"source": ["side2", "angle"], 
-                 "formula": lambda s2, a: s2 * math.tan(math.radians(a))}
+                 "formula": lambda s2, a: s2 * math.tan(math.radians(a))},
+                {"source": ["hypotenuse", "side2"], 
+                 "formula": lambda h, s2: math.sqrt(h**2 - s2**2)}
             ],
             "side2": [
                 {"source": ["hypotenuse", "angle"], 
                  "formula": lambda h, a: h * math.cos(math.radians(a))},
                 {"source": ["side1", "angle"], 
-                 "formula": lambda s1, a: s1 / math.tan(math.radians(a))}
+                 "formula": lambda s1, a: s1 / math.tan(math.radians(a))},
+                {"source": ["hypotenuse", "side1"], 
+                 "formula": lambda h, s1: math.sqrt(h**2 - s1**2)}
             ],
             "hypotenuse": [
                 {"source": ["side1", "angle"], 
                  "formula": lambda s, a: s / math.sin(math.radians(a))},
                 {"source": ["side2", "angle"], 
-                 "formula": lambda s, a: s / math.cos(math.radians(a))}
+                 "formula": lambda s, a: s / math.cos(math.radians(a))},
+                {"source": ["side1", "side2"], 
+                 "formula": lambda s1, s2: math.sqrt(s1**2 + s2**2)}
             ]
         }
     },
@@ -108,90 +114,57 @@ def draw_equilateral_triangle(side: float) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
-    """Draw right triangle with automatic orientation"""
+    """Draw a right-angled triangle with clear labeling of all sides and area."""
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.set_aspect('equal')
+    
+    # Determine base and height (longer side as base)
     base = max(side1, side2)
     height = min(side1, side2)
     
-    fig, ax = plt.subplots(figsize=(6, 6))
-    ax.set_aspect('equal')
+    # Vertices for the right-angled triangle
+    vertices = [
+        [0, 0],          # Right angle vertex
+        [base, 0],       # Base vertex
+        [0, height]      # Height vertex
+    ]
     
-    triangle = Polygon(
-        [[0, 0], [base, 0], [0, height]],
-        closed=True, fill=None, edgecolor='blue', linewidth=2
-    )
+    # Draw the triangle
+    triangle = Polygon(vertices, closed=True, fill=None, 
+                      edgecolor='blue', linewidth=2)
     ax.add_patch(triangle)
     
-    plt.text(base/2, -0.8, f'{base:.2f} cm', ha='center')
-    plt.text(-0.8, height/2, f'{height:.2f} cm', va='center')
-    plt.text(base/2, height/2, f'{hypotenuse:.2f} cm', 
-             ha='center', color='red')
+    # Set axis limits with padding
+    padding = max(base, height) * 0.2
+    ax.set_xlim(-padding, base + padding)
+    ax.set_ylim(-padding, height + padding)
     
-    buf = BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight')
-    plt.close()
-    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
-
-def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
-    """Draw two similar triangles with labeled sides and similarity ratio"""
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.set_aspect('equal')
-    plt.axis('off')
+    # Add grid and axes
+    ax.grid(True, linestyle='--', linewidth=0.5)
+    ax.axhline(0, color='black', linewidth=0.8)
+    ax.axvline(0, color='black', linewidth=0.8)
     
-    # Draw first triangle (ΔABC)
-    triangle1 = Polygon(
-        [[0, 0], [side1, 0], [0, side1*0.6]],
-        closed=True, fill=None, edgecolor='blue', linewidth=2
-    )
-    ax.add_patch(triangle1)
+    # Label all sides
+    ax.text(base/2, -padding/3, f'{base} cm', ha='center', va='top', color='green')  # Base
+    ax.text(-padding/3, height/2, f'{height} cm', ha='right', va='center', color='green')  # Height
+    ax.text(base/2, height/2, f'{hypotenuse} cm', ha='center', va='center', 
+            color='red', rotation=45)  # Hypotenuse
     
-    # Draw second similar triangle (ΔDEF)
-    triangle2 = Polygon(
-        [[side1 + 2, 0], 
-         [side1 + 2 + side2, 0], 
-         [side1 + 2, side2 * 0.6 * ratio]],
-        closed=True, fill=None, edgecolor='red', linewidth=2
-    )
-    ax.add_patch(triangle2)
+    # Calculate and display area
+    area = 0.5 * base * height
+    ax.text(base/2, height + padding/4, 
+            f'Area = ½ × {base} × {height} = {area:.2f} cm²',
+            ha='center', va='bottom', 
+            bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
     
-    # Add labels and annotations
-    plt.text(side1/2, -0.8, f'AB = {side1}', ha='center', fontsize=10)
-    plt.text(side1 + 2 + side2/2, -0.8, f'DE = {side2}', ha='center', fontsize=10)
-    plt.text((side1 + side1 + 2)/2, max(side1*0.6, side2*0.6*ratio)/2,
-             f'Similarity Ratio: {ratio:.2f}:1', ha='center', va='center',
-             fontsize=12, color='purple')
+    # Add title
+    ax.set_title(f"Right-Angled Triangle (Legs: {base} cm, {height} cm; Hypotenuse: {hypotenuse} cm)", pad=15)
     
     # Save to base64
     buf = BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', dpi=150)
-    plt.close(fig)
-    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
-
- # illustration.py
-def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
-    """Draw right triangle with automatic orientation"""
-    # Determine triangle orientation
-    base = max(side1, side2)
-    height = min(side1, side2)
-    
-    fig, ax = plt.subplots(figsize=(6, 6))
-    ax.set_aspect('equal')
-    
-    triangle = plt.Polygon(
-        [[0, 0], [base, 0], [0, height]],
-        closed=True, fill=None, edgecolor='blue', linewidth=2
-    )
-    ax.add_patch(triangle)
-    
-    # Label sides
-    plt.text(base/2, -0.8, f'{base:.2f}', ha='center')
-    plt.text(-0.8, height/2, f'{height:.2f}', va='center')
-    plt.text(base/2, height/2, f'{hypotenuse:.2f}', ha='center', color='red')
-    
-    buf = BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight')
     plt.close()
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
-
 
 def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     """Enhanced normalization with parameter conversion and validation"""
