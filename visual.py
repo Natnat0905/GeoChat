@@ -19,7 +19,7 @@ from io import BytesIO
 import numpy as np
 import cv2
 from sympy import sympify, SympifyError
-from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters)
+from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters, draw_circle_angle)
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
 from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle
@@ -80,6 +80,10 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
   - Use parameters: side1, side2, hypotenuse
   - Specify at least one side and angles
   - Example: {"shape":"right_triangle", "parameters": {"side1": 4, "angles": [90, 40, 50]}
+
+- For circle intersection angles:
+  - Specify both intercepted arcs
+  - Example: {"shape":"circle_angle", "parameters": {"arc1": 120, "arc2": 50}}
 """
 
 SHAPE_NORMALIZATION_RULES = {
@@ -90,6 +94,7 @@ SHAPE_NORMALIZATION_RULES = {
 }
 SHAPE_NORMALIZATION_RULES.update(TRIANGLE_NORMALIZATION_RULES)
 SHAPE_NORMALIZATION_RULES["circle"] = CIRCLE_NORMALIZATION_RULES
+SHAPE_NORMALIZATION_RULES["circle_angle"] = CIRCLE_NORMALIZATION_RULES["circle_angle"]
 
 
 def enhance_explanation(response: str) -> str:
