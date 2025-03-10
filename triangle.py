@@ -95,7 +95,8 @@ def is_valid_triangle(sides: list) -> bool:
 def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     """Draw any triangle with given side lengths and full annotations"""
     # Validate triangle inequality
-    sides = sorted([side_a, side_b, side_c])
+    original_sides = [side_a, side_b, side_c]
+    sides = sorted(original_sides)
     if sides[2] >= sides[0] + sides[1]:
         raise ValueError("Invalid triangle dimensions")
     
@@ -129,7 +130,7 @@ def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     ax.set_ylim(-padding, vertices[2][1] + padding)  # Fixed line
     
     # Label sides and angles
-    label_sides(ax, vertices, [side_a, side_b, side_c])
+    label_sides(ax, vertices, sides)  # Use sorted sides for labeling
     label_angles(ax, vertices)
     
     # Calculate and display properties
@@ -150,19 +151,19 @@ def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def label_sides(ax, vertices, sides):
-    """Label all three sides of the triangle"""
-    # AB side
+    """Label all three sides of the triangle using sorted sides"""
+    # Base side (longest side)
     ax.text((vertices[0][0] + vertices[1][0])/2, 
            (vertices[0][1] + vertices[1][1])/2 - 0.5,
            f'{sides[2]:.1f} cm', ha='center', va='top')
     
-    # AC side
+    # Left side
     ax.text((vertices[0][0] + vertices[2][0])/2 - 0.3, 
            (vertices[0][1] + vertices[2][1])/2,
            f'{sides[0]:.1f} cm', rotation=math.degrees(math.atan2(
                vertices[2][1], vertices[2][0])))
     
-    # BC side
+    # Right side
     ax.text((vertices[1][0] + vertices[2][0])/2 + 0.3, 
            (vertices[1][1] + vertices[2][1])/2,
            f'{sides[1]:.1f} cm', rotation=math.degrees(math.atan2(
