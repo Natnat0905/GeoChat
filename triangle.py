@@ -79,11 +79,13 @@ TRIANGLE_NORMALIZATION_RULES = {
         "derived": {
             "side_a": [{"source": ["base"], "formula": lambda b: b}],
             "side_b": [{"source": ["equal_sides"], "formula": lambda s: s}],
-            "side_c": [{"source": ["equal_sides"], "formula": lambda s: s}]
+            "side_c": [{"source": ["equal_sides"], "formula": lambda s: s}],
+            # Add reverse conversions
+            "base": [{"source": ["side_a"], "formula": lambda a: a}],
+            "equal_sides": [{"source": ["side_b"], "formula": lambda b: b}]
         }
     }
 }
-
 
 def is_valid_triangle(sides: list) -> bool:
     """Check triangle inequality theorem with enhanced validation"""
@@ -378,10 +380,14 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
         normalized['side2'] = normalized.pop('leg2')
     
     if shape_type == "isosceles_triangle":
-        if "base" in params and "equal_sides" in params:
-            params["side_a"] = params["base"]
-            params["side_b"] = params["equal_sides"]
-            params["side_c"] = params["equal_sides"]
+        if "base" in normalized and "equal_sides" in normalized:
+            # Convert to general triangle parameters
+            normalized["side_a"] = normalized["base"]
+            normalized["side_b"] = normalized["equal_sides"]
+            normalized["side_c"] = normalized["equal_sides"]
+            # Remove original parameters to avoid conflicts
+            del normalized["base"]
+            del normalized["equal_sides"]
 
     # Handle equilateral triangle conversions
     if shape_type == "equilateral_triangle":

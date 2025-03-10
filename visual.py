@@ -271,8 +271,8 @@ def handle_visualization(data: dict) -> JSONResponse:
             "equilateral_triangle": (draw_equilateral_triangle, ["side"]),
             "general_triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"]),
             "triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"]), # Alias
-            "isosceles_triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"])
-        }
+            "isosceles_triangle": (lambda a, b, c: draw_general_triangle(a, b, c).replace("General Triangle", f"Isosceles Triangle (Base: {a}cm, Equal Sides: {b}cm)" ), ["side_a", "side_b", "side_c"])        
+            }
 
         if shape not in visualization_mapping:
             return JSONResponse(
@@ -296,7 +296,21 @@ def handle_visualization(data: dict) -> JSONResponse:
             explanation = explanation.replace("rectangle", "square")
             explanation += f"\nNote: Square with side length {clean_params['width']:.2f} cm."
         
-        # Generate the image
+        if shape == "isosceles_triangle":
+            if not all(k in clean_params for k in ["side_a", "side_b", "side_c"]):
+                return JSONResponse(
+                content={"type": "error", "content": "Missing converted parameters for isosceles triangle"},
+                status_code=400
+            )
+
+        # Explicit validation check
+        sides = [clean_params["side_a"], clean_params["side_b"], clean_params["side_c"]]
+        if len(set(sides)) != 2:
+            return JSONResponse(
+                content={"type": "error", "content": "Invalid isosceles triangle - exactly two sides must be equal"},
+                status_code=400
+            )
+
         # Generate the image
         try:
             if shape == "circle":
