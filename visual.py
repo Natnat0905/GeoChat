@@ -88,6 +88,11 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 - For equilateral triangles:
   - Specify side length
   - Example: {"shape":"equilateral_triangle", "parameters": {"side": 5}}
+
+- For any triangle with three sides:
+  - Use "shape": "general_triangle"
+  - Include parameters: "side_a", "side_b", "side_c"
+  - Example: {"shape":"general_triangle", "parameters":{"side_a":7, "side_b":5, "side_c":9}}
 """
 
 SHAPE_NORMALIZATION_RULES = {

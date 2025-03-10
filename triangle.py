@@ -347,6 +347,20 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     """Enhanced normalization with parameter conversion and validation"""
     normalized = params.copy()
     
+    # Convert legacy parameter names for general triangles
+    if shape_type == "general_triangle":
+        param_map = {
+            'side1': 'side_a',
+            'side2': 'side_b', 
+            'side3': 'side_c',
+            'a': 'side_a',
+            'b': 'side_b',
+            'c': 'side_c'
+        }
+        for old_name, new_name in param_map.items():
+            if old_name in normalized:
+                normalized[new_name] = normalized.pop(old_name)
+                
     # Convert legacy parameter names
     if 'leg1' in normalized:
         normalized['side1'] = normalized.pop('leg1')
