@@ -114,7 +114,7 @@ def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     # Set axis limits with padding
     padding = max(sides) * 0.2
     ax.set_xlim(-padding, base + padding)
-    ax.set_ylim(-padding, max(vertices[2][1]) + padding)
+    ax.set_ylim(-padding, vertices[2][1] + padding)  # Fixed line
     
     # Label sides and angles
     label_sides(ax, vertices, [side_a, side_b, side_c])
@@ -123,7 +123,7 @@ def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     # Calculate and display properties
     area = herons_formula(side_a, side_b, side_c)
     perimeter = sum(sides)
-    ax.text(0.5*base, max(vertices[2][1]) + padding/3,
+    ax.text(0.5*base, vertices[2][1] + padding/3,  # Also fixed here
             f"Area: {area:.2f} cm² | Perimeter: {perimeter:.1f} cm",
             ha='center', va='bottom', 
             bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
@@ -360,7 +360,7 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
         for old_name, new_name in param_map.items():
             if old_name in normalized:
                 normalized[new_name] = normalized.pop(old_name)
-                
+
     # Convert legacy parameter names
     if 'leg1' in normalized:
         normalized['side1'] = normalized.pop('leg1')
