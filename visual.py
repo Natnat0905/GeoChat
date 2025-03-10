@@ -93,6 +93,10 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
   - Use "shape": "general_triangle"
   - Include parameters: "side_a", "side_b", "side_c"
   - Example: {"shape":"general_triangle", "parameters":{"side_a":7, "side_b":5, "side_c":9}}
+
+- For isosceles triangles:
+  - Specify "base" and "equal_sides" parameters
+  - Example: {"shape":"isosceles_triangle", "parameters":{"base":10, "equal_sides":6}}
 """
 
 SHAPE_NORMALIZATION_RULES = {
@@ -266,7 +270,8 @@ def handle_visualization(data: dict) -> JSONResponse:
             "similar_triangles": (draw_similar_triangles, ["ratio", "corresponding_side1", "corresponding_side2"]),
             "equilateral_triangle": (draw_equilateral_triangle, ["side"]),
             "general_triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"]),
-            "triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"])  # Alias
+            "triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"]), # Alias
+            "isosceles_triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"])
         }
 
         if shape not in visualization_mapping:

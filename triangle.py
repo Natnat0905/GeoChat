@@ -70,10 +70,20 @@ TRIANGLE_NORMALIZATION_RULES = {
             "area": [{"source": ["side_a", "side_b", "side_c"],
                      "formula": lambda a, b, c: herons_formula(a, b, c)}],
             "height": [{"source": ["area", "side_a"],
-                      "formula": lambda area, a: (2*area)/a}]
+                      "formula": lambda area, a: (2*area)/a}
+            ]
+        }
+    },
+    "isosceles_triangle": {
+        "required": ["base", "equal_sides"],
+        "derived": {
+            "side_a": [{"source": ["base"], "formula": lambda b: b}],
+            "side_b": [{"source": ["equal_sides"], "formula": lambda s: s}],
+            "side_c": [{"source": ["equal_sides"], "formula": lambda s: s}]
         }
     }
 }
+
 
 def is_valid_triangle(sides: list) -> bool:
     """Check triangle inequality theorem"""
@@ -366,7 +376,13 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
         normalized['side1'] = normalized.pop('leg1')
     if 'leg2' in normalized:
         normalized['side2'] = normalized.pop('leg2')
-        
+    
+    if shape_type == "isosceles_triangle":
+        if "base" in params and "equal_sides" in params:
+            params["side_a"] = params["base"]
+            params["side_b"] = params["equal_sides"]
+            params["side_c"] = params["equal_sides"]
+            
     # Handle equilateral triangle conversions
     if shape_type == "equilateral_triangle":
         if "height" in normalized:
