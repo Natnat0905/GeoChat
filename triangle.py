@@ -16,7 +16,8 @@ TRIANGLE_NORMALIZATION_RULES = {
                 {"source": ["side2", "angle"], 
                  "formula": lambda s2, a: s2 * math.tan(math.radians(a))},
                 {"source": ["hypotenuse", "side2"], 
-                 "formula": lambda h, s2: math.sqrt(h**2 - s2**2)}
+                 "formula": lambda h, s2: math.sqrt(h**2 - s2**2)},
+                {"source": ["base"], "formula": lambda b: b}  # Direct mapping
             ],
             "side2": [
                 {"source": ["hypotenuse", "angle"], 
@@ -24,7 +25,8 @@ TRIANGLE_NORMALIZATION_RULES = {
                 {"source": ["side1", "angle"], 
                  "formula": lambda s1, a: s1 / math.tan(math.radians(a))},
                 {"source": ["hypotenuse", "side1"], 
-                 "formula": lambda h, s1: math.sqrt(h**2 - s1**2)}
+                 "formula": lambda h, s1: math.sqrt(h**2 - s1**2)},
+                {"source": ["height"], "formula": lambda h: h}  # Direct mapping
             ],
             "hypotenuse": [
                 {"source": ["side1", "angle"], 
@@ -32,7 +34,9 @@ TRIANGLE_NORMALIZATION_RULES = {
                 {"source": ["side2", "angle"], 
                  "formula": lambda s, a: s / math.cos(math.radians(a))},
                 {"source": ["side1", "side2"], 
-                 "formula": lambda s1, s2: math.sqrt(s1**2 + s2**2)}
+                 "formula": lambda s1, s2: math.sqrt(s1**2 + s2**2)},
+                {"source": ["base", "height"],  # New direct calculation
+                 "formula": lambda b, h: math.sqrt(b**2 + h**2)}
             ]
         }
     },
@@ -55,8 +59,117 @@ TRIANGLE_NORMALIZATION_RULES = {
                  "formula": lambda s1, s2: s1/s2}
             ]
         }
+    },
+    "general_triangle": {
+        "required": ["side_a", "side_b", "side_c"],
+        "derived": {
+            "angle_a": [{"source": ["side_a", "side_b", "side_c"], 
+                       "formula": lambda a, b, c: math.degrees(math.acos((b**2 + c**2 - a**2)/(2*b*c)))}],
+            "angle_b": [{"source": ["side_a", "side_b", "side_c"], 
+                       "formula": lambda a, b, c: math.degrees(math.acos((a**2 + c**2 - b**2)/(2*a*c)))}],
+            "area": [{"source": ["side_a", "side_b", "side_c"],
+                     "formula": lambda a, b, c: herons_formula(a, b, c)}],
+            "height": [{"source": ["area", "side_a"],
+                      "formula": lambda area, a: (2*area)/a}]
+        }
     }
 }
+
+def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
+    """Draw any triangle with given side lengths and full annotations"""
+    # Validate triangle inequality
+    sides = sorted([side_a, side_b, side_c])
+    if sides[2] >= sides[0] + sides[1]:
+        raise ValueError("Invalid triangle dimensions")
+    
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.set_aspect('equal')
+    
+    # Calculate coordinates using Law of Cosines
+    base = sides[2]
+    left = sides[0]
+    right = sides[1]
+    
+    # Calculate angles
+    angle = math.acos((left**2 + base**2 - right**2)/(2*left*base))
+    
+    # Vertex coordinates
+    vertices = [
+        [0, 0],                          # Vertex A
+        [base, 0],                       # Vertex B
+        [left * math.cos(angle),         # Vertex C
+         left * math.sin(angle)]
+    ]
+    
+    # Draw triangle
+    triangle = Polygon(vertices, closed=True, fill=None, 
+                      edgecolor='blue', linewidth=2)
+    ax.add_patch(triangle)
+    
+    # Set axis limits with padding
+    padding = max(sides) * 0.2
+    ax.set_xlim(-padding, base + padding)
+    ax.set_ylim(-padding, max(vertices[2][1]) + padding)
+    
+    # Label sides and angles
+    label_sides(ax, vertices, [side_a, side_b, side_c])
+    label_angles(ax, vertices)
+    
+    # Calculate and display properties
+    area = herons_formula(side_a, side_b, side_c)
+    perimeter = sum(sides)
+    ax.text(0.5*base, max(vertices[2][1]) + padding/3,
+            f"Area: {area:.2f} cm² | Perimeter: {perimeter:.1f} cm",
+            ha='center', va='bottom', 
+            bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
+    
+    # Add title
+    ax.set_title(f"General Triangle (Sides: {side_a} cm, {side_b} cm, {side_c} cm)", pad=15)
+    
+    # Save to base64
+    buf = BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight')
+    plt.close()
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
+
+def label_sides(ax, vertices, sides):
+    """Label all three sides of the triangle"""
+    # AB side
+    ax.text((vertices[0][0] + vertices[1][0])/2, 
+           (vertices[0][1] + vertices[1][1])/2 - 0.5,
+           f'{sides[2]:.1f} cm', ha='center', va='top')
+    
+    # AC side
+    ax.text((vertices[0][0] + vertices[2][0])/2 - 0.3, 
+           (vertices[0][1] + vertices[2][1])/2,
+           f'{sides[0]:.1f} cm', rotation=math.degrees(math.atan2(
+               vertices[2][1], vertices[2][0])))
+    
+    # BC side
+    ax.text((vertices[1][0] + vertices[2][0])/2 + 0.3, 
+           (vertices[1][1] + vertices[2][1])/2,
+           f'{sides[1]:.1f} cm', rotation=math.degrees(math.atan2(
+               vertices[2][1], vertices[2][0] - vertices[1][0])))
+
+def label_angles(ax, vertices):
+    """Label all three angles"""
+    for i in range(3):
+        prev = vertices[i]
+        curr = vertices[(i+1)%3]
+        next_v = vertices[(i+2)%3]
+        
+        angle = math.degrees(math.atan2(next_v[1]-curr[1], next_v[0]-curr[0]) - 
+                            math.atan2(prev[1]-curr[1], prev[0]-curr[0]))
+        angle = (angle + 360) % 360
+        label = f"{angle:.1f}°"
+        
+        ax.text(curr[0], curr[1], label, ha='center', va='center',
+               bbox=dict(facecolor='white', edgecolor='none', pad=1))
+
+def herons_formula(a: float, b: float, c: float) -> float:
+    """Calculate area using Heron's formula"""
+    s = (a + b + c) / 2
+    return math.sqrt(s * (s - a) * (s - b) * (s - c))
 
 def draw_equilateral_triangle(side: float) -> str:
     """Draw an equilateral triangle with clear labeling of all equal sides"""
