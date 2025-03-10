@@ -22,7 +22,7 @@ from sympy import sympify, SympifyError
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters, draw_circle_angle)
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
-from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle, draw_equilateral_triangle
+from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle, draw_equilateral_triangle, draw_general_triangle, is_valid_triangle
 
 
 app = FastAPI()
@@ -259,7 +259,9 @@ def handle_visualization(data: dict) -> JSONResponse:
             "right_triangle": (draw_right_triangle, ["side1", "side2", "hypotenuse"]),  # Updated parameter names
             "trigonometric": (plot_trigonometric_function, ["function"]),
             "similar_triangles": (draw_similar_triangles, ["ratio", "corresponding_side1", "corresponding_side2"]),
-            "equilateral_triangle": (draw_equilateral_triangle, ["side"])
+            "equilateral_triangle": (draw_equilateral_triangle, ["side"]),
+            "general_triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"]),
+            "triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"])  # Alias
         }
 
         if shape not in visualization_mapping:
@@ -285,11 +287,26 @@ def handle_visualization(data: dict) -> JSONResponse:
             explanation += f"\nNote: Square with side length {clean_params['width']:.2f} cm."
         
         # Generate the image
-        if shape == "circle":
-            # Only pass the radius for circle drawing
-            img_base64 = draw_circle(clean_params["radius"])
-        else:
-            img_base64 = viz_func(*args)
+        # Generate the image
+        try:
+            if shape == "circle":
+                img_base64 = draw_circle(clean_params["radius"])
+            elif shape == "general_triangle":
+                # Special handling for triangle validation
+                sides = [clean_params["side_a"], clean_params["side_b"], clean_params["side_c"]]
+                if not is_valid_triangle(sides):
+                    return JSONResponse(
+                        content={"type": "error", "content": "Invalid triangle dimensions - violates triangle inequality"},
+                        status_code=400
+                    )
+                img_base64 = viz_func(*args)
+            else:
+                img_base64 = viz_func(*args)
+        except ValueError as ve:
+            return JSONResponse(
+                content={"type": "error", "content": str(ve)},
+                status_code=400
+            )
 
         # Clean the base64 string to remove prefix
         clean_base64 = img_base64.split(",")[-1] if img_base64 else ""

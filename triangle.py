@@ -75,6 +75,11 @@ TRIANGLE_NORMALIZATION_RULES = {
     }
 }
 
+def is_valid_triangle(sides: list) -> bool:
+    """Check triangle inequality theorem"""
+    a, b, c = sorted(sides)
+    return (a + b) > c
+
 def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     """Draw any triangle with given side lengths and full annotations"""
     # Validate triangle inequality
