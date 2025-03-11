@@ -11,50 +11,28 @@ TRIANGLE_NORMALIZATION_RULES = {
         "required": ["side1", "side2", "hypotenuse"],
         "derived": {
             "side1": [
-                {"source": ["hypotenuse", "angle"], 
-                 "formula": lambda h, a: h * math.sin(math.radians(a))},
-                {"source": ["side2", "angle"], 
-                 "formula": lambda s2, a: s2 * math.tan(math.radians(a))},
-                {"source": ["hypotenuse", "side2"], 
-                 "formula": lambda h, s2: math.sqrt(h**2 - s2**2)},
-                {"source": ["base"], "formula": lambda b: b},  # Direct mapping
                 {"source": ["hypotenuse", "side2"], 
                  "formula": lambda h, s2: math.sqrt(h**2 - s2**2)},
                 {"source": ["hypotenuse", "angle"], 
                  "formula": lambda h, a: h * math.sin(math.radians(a))},
                 {"source": ["side2", "angle"], 
                  "formula": lambda s2, a: s2 * math.tan(math.radians(a))},
-                {"source": ["hypotenuse", "side2"], 
-                 "formula": lambda h, s2: math.sqrt(h**2 - s2**2)},
             ],
             "side2": [
+                {"source": ["hypotenuse", "side1"], 
+                 "formula": lambda h, s1: math.sqrt(h**2 - s1**2)},
                 {"source": ["hypotenuse", "angle"], 
                  "formula": lambda h, a: h * math.cos(math.radians(a))},
                 {"source": ["side1", "angle"], 
                  "formula": lambda s1, a: s1 / math.tan(math.radians(a))},
-                {"source": ["hypotenuse", "side1"], 
-                 "formula": lambda h, s1: math.sqrt(h**2 - s1**2)},
-                {"source": ["height"], "formula": lambda h: h},  # Direct mapping
-                {"source": ["hypotenuse", "side1"], "formula": lambda h, s1: math.sqrt(h**2 - s1**2)}, 
-                {"source": ["hypotenuse", "angle"], 
-                 "formula": lambda h, a: h * math.cos(math.radians(a))},
-                {"source": ["side1", "angle"], 
-                 "formula": lambda s1, a: s1 / math.tan(math.radians(a))},
-                {"source": ["hypotenuse", "side1"], 
-                 "formula": lambda h, s1: math.sqrt(h**2 - s1**2)},
             ],
             "hypotenuse": [
+                {"source": ["side1", "side2"], 
+                 "formula": lambda s1, s2: math.sqrt(s1**2 + s2**2)},
                 {"source": ["side1", "angle"], 
                  "formula": lambda s, a: s / math.sin(math.radians(a))},
                 {"source": ["side2", "angle"], 
                  "formula": lambda s, a: s / math.cos(math.radians(a))},
-                {"source": ["side1", "side2"], 
-                 "formula": lambda s1, s2: math.sqrt(s1**2 + s2**2)},
-                {"source": ["base", "height"],  # New direct calculation
-                 "formula": lambda b, h: math.sqrt(b**2 + h**2)},
-                {"source": ["side1", "side2"], "formula": lambda s1, s2: math.sqrt(s1**2 + s2**2)},
-                {"source": ["side1", "side2"], 
-                 "formula": lambda s1, s2: math.sqrt(s1**2 + s2**2)},
             ]
         }
     },
@@ -409,15 +387,14 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
         elif "area" in normalized:
             normalized["side"] = math.sqrt((4 * normalized["area"]) / math.sqrt(3))
     
-    # Handle right triangle angles
     if shape_type == "right_triangle":
-        # Convert legacy parameter names
+        # Convert legacy parameter names first
         if 'leg1' in normalized:
             normalized['side1'] = normalized.pop('leg1')
         if 'leg2' in normalized:
             normalized['side2'] = normalized.pop('leg2')
         
-        # Handle angle-based parameters
+        # Handle angle parameters first if present
         if 'angles' in normalized:
             angles = [a for a in normalized['angles'] if a != 90]
             if angles:
@@ -434,6 +411,22 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
                     h = normalized['hypotenuse']
                     normalized.setdefault('side1', h * math.sin(math.radians(angle)))
                     normalized.setdefault('side2', h * math.cos(math.radians(angle)))
+
+        # Apply Pythagorean theorem if two sides are provided
+        provided = [k for k in ['side1', 'side2', 'hypotenuse'] if k in normalized]
+        if len(provided) == 2:
+            if 'hypotenuse' in provided:
+                h = normalized['hypotenuse']
+                if 'side1' in provided:
+                    s1 = normalized['side1']
+                    normalized['side2'] = math.sqrt(h**2 - s1**2)
+                elif 'side2' in provided:
+                    s2 = normalized['side2']
+                    normalized['side1'] = math.sqrt(h**2 - s2**2)
+            else:
+                s1 = normalized.get('side1', 0)
+                s2 = normalized.get('side2', 0)
+                normalized['hypotenuse'] = math.sqrt(s1**2 + s2**2)
 
     # Apply normalization rules
     rules = TRIANGLE_NORMALIZATION_RULES.get(shape_type, {})
