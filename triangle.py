@@ -309,7 +309,18 @@ def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
-    """Draw two similar triangles with labeled sides and similarity ratio"""
+    """Improved drawing function with additional validation"""
+    try:
+        side1 = float(side1)
+        side2 = float(side2)
+        hypotenuse = float(hypotenuse)
+    except (TypeError, ValueError):
+        raise ValueError("All parameters must be numeric values")
+
+    # Enhanced validation
+    if not all(isinstance(x, (int, float)) for x in [side1, side2, hypotenuse]):
+        raise ValueError("Invalid parameter types")
+    
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.set_aspect('equal')
     plt.axis('off')
@@ -346,6 +357,18 @@ def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
 def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     """Enhanced normalization with parameter conversion and validation"""
     normalized = params.copy()
+
+     # Convert all values to floats first
+    for k, v in list(normalized.items()):
+        if isinstance(v, str):
+            try:
+                normalized[k] = float(v)
+            except ValueError:
+                del normalized[k]
+                logging.warning(f"Removed invalid parameter: {k}={v}")
+        elif not isinstance(v, (int, float)):
+            del normalized[k]
+            logging.warning(f"Removed non-numeric parameter: {k}={v}")
     
     # Convert legacy parameter names for general triangles
     if shape_type == "general_triangle":
@@ -388,29 +411,21 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
             normalized["side"] = math.sqrt((4 * normalized["area"]) / math.sqrt(3))
     
     if shape_type == "right_triangle":
-        # Convert legacy parameter names first
-        if 'leg1' in normalized:
-            normalized['side1'] = normalized.pop('leg1')
-        if 'leg2' in normalized:
-            normalized['side2'] = normalized.pop('leg2')
-        
-        # Handle angle parameters first if present
-        if 'angles' in normalized:
-            angles = [a for a in normalized['angles'] if a != 90]
-            if angles:
-                angle = angles[0]
-                if 'side1' in normalized:
-                    s = normalized['side1']
-                    normalized.setdefault('side2', s / math.tan(math.radians(angle)))
-                    normalized.setdefault('hypotenuse', s / math.sin(math.radians(angle)))
-                elif 'side2' in normalized:
-                    s = normalized['side2']
-                    normalized.setdefault('side1', s * math.tan(math.radians(angle)))
-                    normalized.setdefault('hypotenuse', s / math.cos(math.radians(angle)))
-                elif 'hypotenuse' in normalized:
-                    h = normalized['hypotenuse']
-                    normalized.setdefault('side1', h * math.sin(math.radians(angle)))
-                    normalized.setdefault('side2', h * math.cos(math.radians(angle)))
+        # Ensure numeric types for calculations
+        try:
+            hypotenuse = float(normalized.get("hypotenuse", 0))
+            side1 = float(normalized.get("side1", 0))
+            side2 = float(normalized.get("side2", 0))
+        except (TypeError, ValueError):
+            raise ValueError("Invalid numeric parameters for right triangle")
+
+        # Pythagorean calculation with validation
+        if hypotenuse and side1 and not side2:
+            normalized["side2"] = math.sqrt(hypotenuse**2 - side1**2)
+        elif hypotenuse and side2 and not side1:
+            normalized["side1"] = math.sqrt(hypotenuse**2 - side2**2)
+        elif side1 and side2 and not hypotenuse:
+            normalized["hypotenuse"] = math.sqrt(side1**2 + side2**2)
 
         # Apply Pythagorean theorem if two sides are provided
         provided = [k for k in ['side1', 'side2', 'hypotenuse'] if k in normalized]
