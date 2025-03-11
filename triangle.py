@@ -263,52 +263,54 @@ def draw_equilateral_triangle(side: float) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
-    """Draw a right-angled triangle with clear labeling"""
-    # Validate Pythagorean theorem
+    """Draw a right-angled triangle with validated parameters and clear labeling."""
+    # Validate input parameters to ensure they are not None and are positive numbers
+    if None in (side1, side2, hypotenuse) or any(x <= 0 for x in (side1, side2, hypotenuse)):
+        raise ValueError("All sides must be positive numbers.")
+    
+    # Validate Pythagorean theorem to confirm it's a right triangle
     if not math.isclose(hypotenuse**2, side1**2 + side2**2, rel_tol=0.01):
-        raise ValueError("Invalid right triangle parameters")
+        raise ValueError("Invalid right triangle parameters according to the Pythagorean theorem.")
     
     fig, ax = plt.subplots(figsize=(7, 7))
     ax.set_aspect('equal')
     
-    # Determine orientation
-    base = max(side1, side2)
-    height = min(side1, side2)
+    # Determine base and height (longer side as base for better visualization)
+    base, height = (side1, side2) if side1 > side2 else (side2, side1)
     
+    # Define vertices for the right-angled triangle
     vertices = [
-        [0, 0],          # Right angle
+        [0, 0],          # Right angle vertex
         [base, 0],       # Base vertex
         [0, height]      # Height vertex
     ]
     
-    triangle = Polygon(vertices, closed=True, fill=None, 
-                     edgecolor='blue', linewidth=2)
+    # Create and add the triangle patch
+    triangle = Polygon(vertices, closed=True, fill=None, edgecolor='blue', linewidth=2)
     ax.add_patch(triangle)
     
-    # Set display boundaries
+    # Set axis limits with padding for clarity
     padding = max(base, height) * 0.2
     ax.set_xlim(-padding, base + padding)
     ax.set_ylim(-padding, height + padding)
     
-    # Label sides with colors
-    ax.text(base/2, -padding/3, f'{base} cm',  # Base
-           ha='center', va='top', color='#2ecc71')
-    ax.text(-padding/3, height/2, f'{height} cm',  # Height
-           ha='right', va='center', color='#e67e22')
-    ax.text(base/2, height/2, f'{hypotenuse} cm',  # Hypotenuse
-           ha='center', va='center', color='#e74c3c', rotation=45)
+    # Label all sides with distinct colors
+    ax.text(base/2, -padding/3, f'{base} cm', ha='center', va='top', color='green')  # Base
+    ax.text(-padding/3, height/2, f'{height} cm', ha='right', va='center', color='green')  # Height
+    ax.text(base/2, height/2, f'{hypotenuse} cm', ha='center', va='center', 
+            color='red', rotation=45)  # Hypotenuse
     
-    # Add calculations
+    # Calculate and display area
     area = 0.5 * base * height
     ax.text(base/2, height + padding/4, 
-           f'Area = ½ × {base} × {height} = {area:.2f} cm²',
-           ha='center', va='bottom', fontsize=10,
-           bbox=dict(boxstyle="round", fc="#f8f9fa", ec="#3498db"))
+            f'Area = ½ × {base} × {height} = {area:.2f} cm²',
+            ha='center', va='bottom', 
+            bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
     
-    ax.set_title(f"Right-Angled Triangle\n"
-                f"Legs: {base} cm and {height} cm | Hypotenuse: {hypotenuse} cm", 
-                pad=15, color='#2c3e50')
+    # Set the title with all parameters
+    ax.set_title(f"Right-Angled Triangle (Legs: {base} cm, {height} cm; Hypotenuse: {hypotenuse} cm)", pad=15)
     
+    # Save the figure to a base64 string
     buf = BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight')
     plt.close()
