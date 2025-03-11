@@ -87,36 +87,39 @@ TRIANGLE_NORMALIZATION_RULES = {
 }
 
 def is_valid_triangle(sides: list) -> bool:
-    """Check triangle inequality theorem with enhanced validation"""
-    a, b, c = sorted(sides)
-    return (a + b) > c and all(s > 0 for s in sides)
+    """Enhanced validation with parameter order preservation"""
+    a, b, c = sides  # Keep original order
+    return (a + b > c) and (a + c > b) and (b + c > a) and all(s > 0 for s in sides)
 
 def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     """Draw any triangle with given side lengths and full annotations"""
     # Validate triangle inequality
-    sides = [side_a, side_b, side_c]
-    if not is_valid_triangle(sides):
+    sides = [side_a, side_b, side_c]    # Validate triangle inequality
+    if not is_valid_triangle([side_a, side_b, side_c]):
         raise ValueError("Invalid triangle dimensions")
     
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.set_aspect('equal')
     
-    # Use original side order for vertex calculation
-    base = side_a  # Use first side as base by default
+    # Preserve original order but ensure base is horizontal
+    base = side_a
     left = side_b
     right = side_c
     
-    # Calculate angles using original side order
-    angle = math.acos((left**2 + base**2 - right**2)/(2*left*base))
+    # Calculate angles using Law of Cosines
+    try:
+        angle = math.acos((left**2 + base**2 - right**2)/(2*left*base))
+    except ValueError:
+        # Handle floating point precision issues
+        angle = math.acos(round((left**2 + base**2 - right**2)/(2*left*base), 10))
     
-    # Vertex coordinates
+    # Calculate vertex coordinates
     vertices = [
-        [0, 0],                          # Vertex A
-        [base, 0],                       # Vertex B
-        [left * math.cos(angle),         # Vertex C
-         left * math.sin(angle)]
+        [0, 0],                   # Vertex A (base start)
+        [base, 0],                # Vertex B (base end)
+        [left*math.cos(angle),    # Vertex C (apex)
+         left*math.sin(angle)]
     ]
-
     # Draw triangle
     triangle = Polygon(vertices, closed=True, fill=None, 
                       edgecolor='blue', linewidth=2)
@@ -149,31 +152,37 @@ def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def label_sides(ax, vertices, original_sides):
-    """Label all three sides using original side order"""
-    # Base side (side_a)
+    """Label all three sides with proper orientation"""
+    # Base label (side_a)
     ax.text((vertices[0][0] + vertices[1][0])/2, 
            (vertices[0][1] + vertices[1][1])/2 - 0.5,
-           f'{original_sides[0]:.1f} cm', ha='center', va='top')
+           f'{original_sides[0]:.1f} cm', 
+           ha='center', va='top', color='darkgreen')
     
-    # Left side (side_b)
-    rotation = math.degrees(math.atan2(vertices[2][1], vertices[2][0]))
-    ax.text((vertices[0][0] + vertices[2][0])/2 - 0.3, 
+    # Left side label (side_b)
+    dx = vertices[2][0] - vertices[0][0]
+    dy = vertices[2][1] - vertices[0][1]
+    rotation = math.degrees(math.atan2(dy, dx))
+    ax.text((vertices[0][0] + vertices[2][0])/2 - 0.2,
            (vertices[0][1] + vertices[2][1])/2,
-           f'{original_sides[1]:.1f} cm', 
-           rotation=rotation if rotation < 90 else rotation-180,
-           ha='right' if rotation < 90 else 'left', 
-           va='center')
+           f'{original_sides[1]:.1f} cm',
+           rotation=rotation, 
+           ha='right' if dx < 0 else 'left',
+           va='center',
+           color='navy')
     
-    # Right side (side_c)
+    # Right side label (side_c)
     dx = vertices[2][0] - vertices[1][0]
-    rotation = math.degrees(math.atan2(vertices[2][1], dx))
-    ax.text((vertices[1][0] + vertices[2][0])/2 + 0.3, 
+    dy = vertices[2][1] - vertices[1][1]
+    rotation = math.degrees(math.atan2(dy, dx))
+    ax.text((vertices[1][0] + vertices[2][0])/2 + 0.2,
            (vertices[1][1] + vertices[2][1])/2,
-           f'{original_sides[2]:.1f} cm', 
-           rotation=rotation if rotation > 90 else rotation+180,
-           ha='left' if rotation > 90 else 'right', 
-           va='center')
-
+           f'{original_sides[2]:.1f} cm',
+           rotation=rotation,
+           ha='left' if dx > 0 else 'right',
+           va='center',
+           color='maroon')
+    
 def label_angles(ax, vertices):
     """Label all three angles"""
     for i in range(3):
@@ -387,13 +396,16 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     
     if shape_type == "isosceles_triangle":
         if "base" in normalized and "equal_sides" in normalized:
-            # Convert to general triangle parameters
+            # Preserve parameter order for drawing
             normalized["side_a"] = normalized["base"]
             normalized["side_b"] = normalized["equal_sides"]
             normalized["side_c"] = normalized["equal_sides"]
-            # Remove original parameters to avoid conflicts
             del normalized["base"]
             del normalized["equal_sides"]
+            
+            # Verify isosceles property
+            if normalized["side_b"] != normalized["side_c"]:
+                raise ValueError("Invalid isosceles triangle parameters")
 
     # Handle equilateral triangle conversions
     if shape_type == "equilateral_triangle":
