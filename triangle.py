@@ -17,7 +17,9 @@ TRIANGLE_NORMALIZATION_RULES = {
                  "formula": lambda s2, a: s2 * math.tan(math.radians(a))},
                 {"source": ["hypotenuse", "side2"], 
                  "formula": lambda h, s2: math.sqrt(h**2 - s2**2)},
-                {"source": ["base"], "formula": lambda b: b}  # Direct mapping
+                {"source": ["base"], "formula": lambda b: b},  # Direct mapping
+                {"source": ["hypotenuse", "side2"], 
+                 "formula": lambda h, s2: math.sqrt(h**2 - s2**2)},
             ],
             "side2": [
                 {"source": ["hypotenuse", "angle"], 
@@ -26,7 +28,8 @@ TRIANGLE_NORMALIZATION_RULES = {
                  "formula": lambda s1, a: s1 / math.tan(math.radians(a))},
                 {"source": ["hypotenuse", "side1"], 
                  "formula": lambda h, s1: math.sqrt(h**2 - s1**2)},
-                {"source": ["height"], "formula": lambda h: h}  # Direct mapping
+                {"source": ["height"], "formula": lambda h: h},  # Direct mapping
+                {"source": ["hypotenuse", "side1"], "formula": lambda h, s1: math.sqrt(h**2 - s1**2)}, 
             ],
             "hypotenuse": [
                 {"source": ["side1", "angle"], 
@@ -36,7 +39,8 @@ TRIANGLE_NORMALIZATION_RULES = {
                 {"source": ["side1", "side2"], 
                  "formula": lambda s1, s2: math.sqrt(s1**2 + s2**2)},
                 {"source": ["base", "height"],  # New direct calculation
-                 "formula": lambda b, h: math.sqrt(b**2 + h**2)}
+                 "formula": lambda b, h: math.sqrt(b**2 + h**2)},
+                {"source": ["side1", "side2"], "formula": lambda s1, s2: math.sqrt(s1**2 + s2**2)},
             ]
         }
     },
@@ -259,23 +263,51 @@ def draw_equilateral_triangle(side: float) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
-    """Draw right triangle with automatic orientation"""
+    """Draw a right-angled triangle with clear labeling"""
+    # Validate Pythagorean theorem
+    if not math.isclose(hypotenuse**2, side1**2 + side2**2, rel_tol=0.01):
+        raise ValueError("Invalid right triangle parameters")
+    
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.set_aspect('equal')
+    
+    # Determine orientation
     base = max(side1, side2)
     height = min(side1, side2)
     
-    fig, ax = plt.subplots(figsize=(6, 6))
-    ax.set_aspect('equal')
+    vertices = [
+        [0, 0],          # Right angle
+        [base, 0],       # Base vertex
+        [0, height]      # Height vertex
+    ]
     
-    triangle = Polygon(
-        [[0, 0], [base, 0], [0, height]],
-        closed=True, fill=None, edgecolor='blue', linewidth=2
-    )
+    triangle = Polygon(vertices, closed=True, fill=None, 
+                     edgecolor='blue', linewidth=2)
     ax.add_patch(triangle)
     
-    plt.text(base/2, -0.8, f'{base:.2f} cm', ha='center')
-    plt.text(-0.8, height/2, f'{height:.2f} cm', va='center')
-    plt.text(base/2, height/2, f'{hypotenuse:.2f} cm', 
-             ha='center', color='red')
+    # Set display boundaries
+    padding = max(base, height) * 0.2
+    ax.set_xlim(-padding, base + padding)
+    ax.set_ylim(-padding, height + padding)
+    
+    # Label sides with colors
+    ax.text(base/2, -padding/3, f'{base} cm',  # Base
+           ha='center', va='top', color='#2ecc71')
+    ax.text(-padding/3, height/2, f'{height} cm',  # Height
+           ha='right', va='center', color='#e67e22')
+    ax.text(base/2, height/2, f'{hypotenuse} cm',  # Hypotenuse
+           ha='center', va='center', color='#e74c3c', rotation=45)
+    
+    # Add calculations
+    area = 0.5 * base * height
+    ax.text(base/2, height + padding/4, 
+           f'Area = ½ × {base} × {height} = {area:.2f} cm²',
+           ha='center', va='bottom', fontsize=10,
+           bbox=dict(boxstyle="round", fc="#f8f9fa", ec="#3498db"))
+    
+    ax.set_title(f"Right-Angled Triangle\n"
+                f"Legs: {base} cm and {height} cm | Hypotenuse: {hypotenuse} cm", 
+                pad=15, color='#2c3e50')
     
     buf = BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight')
