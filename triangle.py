@@ -80,7 +80,6 @@ TRIANGLE_NORMALIZATION_RULES = {
             "side_a": [{"source": ["base"], "formula": lambda b: b}],
             "side_b": [{"source": ["equal_sides"], "formula": lambda s: s}],
             "side_c": [{"source": ["equal_sides"], "formula": lambda s: s}],
-            # Add reverse conversions
             "base": [{"source": ["side_a"], "formula": lambda a: a}],
             "equal_sides": [{"source": ["side_b"], "formula": lambda b: b}]
         }
@@ -95,20 +94,19 @@ def is_valid_triangle(sides: list) -> bool:
 def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     """Draw any triangle with given side lengths and full annotations"""
     # Validate triangle inequality
-    original_sides = [side_a, side_b, side_c]
-    sides = sorted(original_sides)
-    if sides[2] >= sides[0] + sides[1]:
+    sides = [side_a, side_b, side_c]
+    if not is_valid_triangle(sides):
         raise ValueError("Invalid triangle dimensions")
     
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.set_aspect('equal')
     
-    # Calculate coordinates using Law of Cosines
-    base = sides[2]
-    left = sides[0]
-    right = sides[1]
+    # Use original side order for vertex calculation
+    base = side_a  # Use first side as base by default
+    left = side_b
+    right = side_c
     
-    # Calculate angles
+    # Calculate angles using original side order
     angle = math.acos((left**2 + base**2 - right**2)/(2*left*base))
     
     # Vertex coordinates
@@ -118,7 +116,7 @@ def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
         [left * math.cos(angle),         # Vertex C
          left * math.sin(angle)]
     ]
-    
+
     # Draw triangle
     triangle = Polygon(vertices, closed=True, fill=None, 
                       edgecolor='blue', linewidth=2)
@@ -150,24 +148,31 @@ def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     plt.close()
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
-def label_sides(ax, vertices, sides):
-    """Label all three sides of the triangle using sorted sides"""
-    # Base side (longest side)
+def label_sides(ax, vertices, original_sides):
+    """Label all three sides using original side order"""
+    # Base side (side_a)
     ax.text((vertices[0][0] + vertices[1][0])/2, 
            (vertices[0][1] + vertices[1][1])/2 - 0.5,
-           f'{sides[2]:.1f} cm', ha='center', va='top')
+           f'{original_sides[0]:.1f} cm', ha='center', va='top')
     
-    # Left side
+    # Left side (side_b)
+    rotation = math.degrees(math.atan2(vertices[2][1], vertices[2][0]))
     ax.text((vertices[0][0] + vertices[2][0])/2 - 0.3, 
            (vertices[0][1] + vertices[2][1])/2,
-           f'{sides[0]:.1f} cm', rotation=math.degrees(math.atan2(
-               vertices[2][1], vertices[2][0])))
+           f'{original_sides[1]:.1f} cm', 
+           rotation=rotation if rotation < 90 else rotation-180,
+           ha='right' if rotation < 90 else 'left', 
+           va='center')
     
-    # Right side
+    # Right side (side_c)
+    dx = vertices[2][0] - vertices[1][0]
+    rotation = math.degrees(math.atan2(vertices[2][1], dx))
     ax.text((vertices[1][0] + vertices[2][0])/2 + 0.3, 
            (vertices[1][1] + vertices[2][1])/2,
-           f'{sides[1]:.1f} cm', rotation=math.degrees(math.atan2(
-               vertices[2][1], vertices[2][0] - vertices[1][0])))
+           f'{original_sides[2]:.1f} cm', 
+           rotation=rotation if rotation > 90 else rotation+180,
+           ha='left' if rotation > 90 else 'right', 
+           va='center')
 
 def label_angles(ax, vertices):
     """Label all three angles"""

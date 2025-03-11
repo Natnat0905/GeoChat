@@ -271,8 +271,8 @@ def handle_visualization(data: dict) -> JSONResponse:
             "equilateral_triangle": (draw_equilateral_triangle, ["side"]),
             "general_triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"]),
             "triangle": (draw_general_triangle, ["side_a", "side_b", "side_c"]), # Alias
-            "isosceles_triangle": (lambda a, b, c: draw_general_triangle(a, b, c),["side_a", "side_b", "side_c"])
-            }
+            "isosceles_triangle": (lambda a, b, c: draw_general_triangle(a, b, c).replace("General Triangle", f"Isosceles Triangle (Base: {a}cm, Equal Sides: {b}cm)"),["side_a", "side_b", "side_c"])
+            }  
 
         if shape not in visualization_mapping:
             return JSONResponse(
