@@ -297,19 +297,9 @@ def handle_visualization(data: dict) -> JSONResponse:
             explanation += f"\nNote: Square with side length {clean_params['width']:.2f} cm."
         
         if shape == "isosceles_triangle":
-            if not all(k in clean_params for k in ["side_a", "side_b", "side_c"]):
-                return JSONResponse(
-                content={"type": "error", "content": "Missing converted parameters for isosceles triangle"},
-                status_code=400
-            )
-
-        # Explicit validation check
-        sides = [clean_params["side_a"], clean_params["side_b"], clean_params["side_c"]]
-        if len(set(sides)) != 2:
-            return JSONResponse(
-                content={"type": "error", "content": "Invalid isosceles triangle - exactly two sides must be equal"},
-                status_code=400
-            )
+            sides = [clean_params["side_a"], clean_params["side_b"], clean_params["side_c"]]
+            if len(set(sides)) != 2:
+                return JSONResponse(content={"type": "error", "content": "Invalid isosceles triangle."}, status_code=400)
 
         # Generate the image
         try:
