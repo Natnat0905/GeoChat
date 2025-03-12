@@ -402,16 +402,13 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     angles = normalized.pop('angles', None)
     if angles is not None:
         try:
-            # Validate angles format
-            if not isinstance(angles, list) or len(angles) != 3:
-                raise ValueError("Angles must be a list of three numbers")
-            angles = [float(a) for a in angles]
-            if not math.isclose(sum(angles), 180, rel_tol=0.01):
-                raise ValueError("Angles must sum to 180 degrees")
-            normalized['angles'] = angles
+            if isinstance(angles, list) and len(angles) == 3:
+                angles = [float(a) for a in angles]
+                if math.isclose(sum(angles), 180, rel_tol=0.01):
+                    normalized['angles'] = angles
         except (TypeError, ValueError) as e:
             logging.warning(f"Invalid angles parameter: {e}")
-
+            
      # Convert all values to floats first
     for k, v in list(normalized.items()):
         if isinstance(v, str):
@@ -444,9 +441,7 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     if 'leg2' in normalized:
         normalized['side2'] = normalized.pop('leg2')
     
-    if shape_type == "right_triangle":
-        angles = normalized.get('angles')
-        if angles and sorted(angles) == [30, 60, 90]:
+    if shape_type == "right_triangle" and normalized.get('angles') == [30.0, 60.0, 90.0]:
             # Handle 30-60-90 triangle ratios
             hypotenuse = normalized.get('hypotenuse')
             side1 = normalized.get('side1')
