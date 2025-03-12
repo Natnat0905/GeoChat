@@ -399,6 +399,19 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     """Enhanced normalization with parameter conversion and validation"""
     normalized = params.copy()
 
+    angles = normalized.pop('angles', None)
+    if angles is not None:
+        try:
+            # Validate angles format
+            if not isinstance(angles, list) or len(angles) != 3:
+                raise ValueError("Angles must be a list of three numbers")
+            angles = [float(a) for a in angles]
+            if not math.isclose(sum(angles), 180, rel_tol=0.01):
+                raise ValueError("Angles must sum to 180 degrees")
+            normalized['angles'] = angles
+        except (TypeError, ValueError) as e:
+            logging.warning(f"Invalid angles parameter: {e}")
+
      # Convert all values to floats first
     for k, v in list(normalized.items()):
         if isinstance(v, str):
