@@ -354,6 +354,47 @@ def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
     plt.close(fig)
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
+def draw_right_triangle_angle(side1: float, side2: float, hypotenuse: float, angles: list = None) -> str:
+    """Draw a right triangle with labeled angles for 30-60-90 triangles"""
+    fig, ax = plt.subplots()
+
+    # Assign base and height based on input
+    base, height = side1, side2  # Assuming side1 is horizontal and side2 is vertical
+
+    # Draw the triangle
+    ax.plot([0, base, 0, 0], [0, 0, height, 0], 'k-')
+
+    # Check if it's a 30-60-90 triangle
+    if angles and sorted(angles) == [30, 60, 90]:
+        ax.text(0, 0, '90°', ha='center', va='center', color='red')  # Right angle at origin
+
+        # Identify the shorter leg (opposite 30°) and longer leg (opposite 60°)
+        shorter, longer = min(side1, side2), max(side1, side2)
+        
+        if shorter == side1:  # Base is the shorter leg (opposite 30°)
+            ax.text(base - 1, 0.5, '60°', ha='center', va='center', color='red')  # Near base
+            ax.text(0.5, height - 1, '30°', ha='center', va='center', color='red')  # Near height
+        else:  # Base is the longer leg (opposite 60°)
+            ax.text(base - 1, 0.5, '30°', ha='center', va='center', color='red')
+            ax.text(0.5, height - 1, '60°', ha='center', va='center', color='red')
+
+    # Label the sides with angles
+    padding = 0.5  # Space for text
+    if angles and sorted(angles) == [30, 60, 90]:
+        base_label = f'{base} cm (60°)' if base > height else f'{base} cm (30°)'
+        height_label = f'{height} cm (30°)' if base > height else f'{height} cm (60°)'
+    else:
+        base_label = f'{base} cm'
+        height_label = f'{height} cm'
+
+    ax.text(base / 2, -padding / 3, base_label, ha='center', va='top', color='green')
+    ax.text(-padding / 3, height / 2, height_label, ha='right', va='center', color='green')
+
+    ax.set_xlim(-1, base + 1)
+    ax.set_ylim(-1, height + 1)
+    ax.set_aspect('equal')
+    plt.show()
+
 def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     """Enhanced normalization with parameter conversion and validation"""
     normalized = params.copy()
@@ -389,6 +430,34 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
         normalized['side1'] = normalized.pop('leg1')
     if 'leg2' in normalized:
         normalized['side2'] = normalized.pop('leg2')
+    
+    if shape_type == "right_triangle":
+        angles = normalized.get('angles')
+        if angles and sorted(angles) == [30, 60, 90]:
+            # Handle 30-60-90 triangle ratios
+            hypotenuse = normalized.get('hypotenuse')
+            side1 = normalized.get('side1')
+            side2 = normalized.get('side2')
+            
+            if hypotenuse:
+                normalized['side1'] = hypotenuse / 2
+                normalized['side2'] = (hypotenuse * math.sqrt(3)) / 2
+            elif side1:
+                normalized['hypotenuse'] = 2 * side1
+                normalized['side2'] = side1 * math.sqrt(3)
+            elif side2:
+                normalized['hypotenuse'] = (2 * side2) / math.sqrt(3)
+                normalized['side1'] = side2 / math.sqrt(3)
+            else:
+                raise ValueError("For 30-60-90 triangle, provide one side.")
+            
+            # Validate provided sides match ratios
+            if 'hypotenuse' in params and not math.isclose(params['hypotenuse'], normalized['hypotenuse'], rel_tol=0.01):
+                raise ValueError("Provided hypotenuse doesn't match 30-60-90 ratio.")
+            if 'side1' in params and not math.isclose(params['side1'], normalized['side1'], rel_tol=0.01):
+                raise ValueError("Provided side1 doesn't match 30-60-90 ratio.")
+            if 'side2' in params and not math.isclose(params['side2'], normalized['side2'], rel_tol=0.01):
+                raise ValueError("Provided side2 doesn't match 30-60-90 ratio.")
     
     if shape_type == "isosceles_triangle":
         if "base" in normalized and "equal_sides" in normalized:

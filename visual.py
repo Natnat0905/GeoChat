@@ -97,6 +97,11 @@ TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-relat
 - For isosceles triangles:
   - Specify "base" and "equal_sides" parameters
   - Example: {"shape":"isosceles_triangle", "parameters":{"base":10, "equal_sides":6}}
+
+- For right triangles with 30-60-90 angles:
+  - Specify hypotenuse or one leg
+  - Include angles parameter: "angles": [30,60,90]
+  - Example: {"shape":"right_triangle", "parameters": {"hypotenuse": 10, "angles": [30,60,90]}
 """
 
 SHAPE_NORMALIZATION_RULES = {
