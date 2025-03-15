@@ -6,7 +6,7 @@ import io
 
 def draw_rectangle(width: float, height: float, title: str = None) -> str:
     """Generate a rectangle (or square) visualization on a properly scaled graph."""
-    fig, ax = plt.subplots(figsize=(7, 7))  # Square figure for correct aspect ratio
+    fig, ax = plt.subplots(figsize=(10, 10))  # Larger figure for better visualization
 
     # Set the lower-left corner of the rectangle at (0,0) for intuitive placement
     rect = plt.Rectangle((0, 0), width, height, fill=False, color='blue', linewidth=2)

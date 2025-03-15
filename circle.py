@@ -6,7 +6,7 @@ from io import BytesIO
 
 def draw_circle(radius: float) -> str:
     """Generate a circle visualization on a properly scaled graph."""
-    fig, ax = plt.subplots(figsize=(7, 7))  # Keep graph size consistent with rectangles/squares
+    fig, ax = plt.subplots(figsize=(10, 10))  # Bigger image
 
     # Draw the circle centered at (0,0)
     circle = plt.Circle((0, 0), radius, color='blue', fill=False, linewidth=2)
@@ -73,7 +73,7 @@ def normalize_circle_parameters(params: dict) -> dict:
 
 def draw_circle_angle(arc1: float, arc2: float, radius: float = 5) -> str:
     """Visualize intersecting chords with angle calculation"""
-    fig, ax = plt.subplots(figsize=(8, 8))
+    fig, ax = plt.subplots(figsize=(10, 10))  # Bigger image
     ax.set_aspect('equal')
     
     # Draw circle with default radius if not provided

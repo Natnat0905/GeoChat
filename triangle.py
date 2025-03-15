@@ -94,7 +94,7 @@ def draw_general_triangle(side_a: float, side_b: float, side_c: float) -> str:
     if not is_valid_triangle([side_a, side_b, side_c]):
         raise ValueError("Invalid triangle dimensions")
     
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(10, 10))  # Bigger image
     ax.set_aspect('equal')
     
     # Preserve original order but ensure base is horizontal
@@ -201,7 +201,7 @@ def herons_formula(a: float, b: float, c: float) -> float:
 
 def draw_equilateral_triangle(side: float) -> str:
     """Draw an equilateral triangle with clear labeling of all equal sides"""
-    fig, ax = plt.subplots(figsize=(7, 7))
+    fig, ax = plt.subplots(figsize=(10, 10))  # Bigger image
     ax.set_aspect('equal')
     
     # Calculate triangle properties
@@ -267,7 +267,7 @@ def draw_right_triangle(side1: float, side2: float, hypotenuse: float, angles: l
         except TypeError:
             pass
         
-    fig, ax = plt.subplots(figsize=(7, 7))
+    fig, ax = plt.subplots(figsize=(10, 10))  # Bigger image
     ax.set_aspect('equal')
     
     # Determine base and height (longer side as base)
@@ -342,7 +342,7 @@ def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
     if not all(isinstance(x, (int, float)) for x in [side1, side2, hypotenuse]):
         raise ValueError("Invalid parameter types")
     
-    fig, ax = plt.subplots(figsize=(8, 4))
+    fig, ax = plt.subplots(figsize=(10, 10))  # Bigger image
     ax.set_aspect('equal')
     plt.axis('off')
     
