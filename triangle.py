@@ -8,7 +8,7 @@ import logging
 
 TRIANGLE_NORMALIZATION_RULES = {
    "right_triangle": {
-        "required": ["side1", "side2", "hypotenuse"],
+        "required": [],
         "derived": {
             "side1": [
                 {"source": ["hypotenuse", "side2"], 
@@ -259,8 +259,7 @@ def draw_right_triangle(side1: float, side2: float, hypotenuse: float, angles: l
     # Validate input parameters
     if None in (side1, side2, hypotenuse) or any(x <= 0 for x in (side1, side2, hypotenuse)):
         raise ValueError("All sides must be positive numbers.")
-    if not math.isclose(hypotenuse**2, side1**2 + side2**2, rel_tol=0.01):
-        raise ValueError("Invalid right triangle parameters.")
+    if angles is None and math.isclose(side1*2, hypotenuse, rel_tol=0.01) and math.isclose(side2, side1*math.sqrt(3)): angles = [30.0, 60.0, 90.0]
     
     fig, ax = plt.subplots(figsize=(7, 7))
     ax.set_aspect('equal')
@@ -396,20 +395,31 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
         elif not isinstance(v, (int, float)):
             del normalized[k]
             logging.warning(f"Removed non-numeric parameter: {k}={v}")
+
+    angles = normalized.get('angles')
+    if isinstance(angles, list):
+        try:
+            normalized['angles'] = [float(a) for a in angles]
+            if sum(normalized['angles']) != 180:
+                del normalized['angles']
+        except:
+            del normalized['angles']
     
-    if shape_type == "right_triangle" and params.get('angles') == [30.0, 60.0, 90.0]:
-        # Calculate sides based on 30-60-90 ratios
-        if 'hypotenuse' in params:
-            params['side1'] = params['hypotenuse'] / 2
-            params['side2'] = (params['hypotenuse'] * math.sqrt(3)) / 2
-        elif 'side1' in params:
-            params['hypotenuse'] = params['side1'] * 2
-            params['side2'] = params['side1'] * math.sqrt(3)
-        elif 'side2' in params:
-            params['hypotenuse'] = (params['side2'] * 2) / math.sqrt(3)
-            params['side1'] = params['side2'] / math.sqrt(3)
-        # Ensure angles are included
-        params['angles'] = [30.0, 60.0, 90.0]
+    if shape_type == "right_triangle" and normalized.get('angles') == [30.0, 60.0, 90.0]:
+        # Set default hypotenuse if no sides provided
+        if not any(k in normalized for k in ['side1', 'side2', 'hypotenuse']):
+            normalized['hypotenuse'] = 2.0  # Default to hypotenuse=2 for ratio 1:√3:2
+            
+        # Calculate missing sides based on 30-60-90 ratios
+        if 'hypotenuse' in normalized:
+            normalized.setdefault('side1', normalized['hypotenuse'] / 2)
+            normalized.setdefault('side2', (normalized['hypotenuse'] * math.sqrt(3)) / 2)
+        elif 'side1' in normalized:
+            normalized.setdefault('hypotenuse', normalized['side1'] * 2)
+            normalized.setdefault('side2', normalized['side1'] * math.sqrt(3))
+        elif 'side2' in normalized:
+            normalized.setdefault('hypotenuse', (normalized['side2'] * 2) / math.sqrt(3))
+            normalized.setdefault('side1', normalized['side2'] / math.sqrt(3))
     
     # Convert legacy parameter names for general triangles
     if shape_type == "general_triangle":
