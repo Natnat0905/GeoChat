@@ -22,8 +22,7 @@ from sympy import sympify, SympifyError
 from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_parameters, draw_circle_angle)
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
-from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle, draw_equilateral_triangle, draw_general_triangle, is_valid_triangle, draw_right_triangle_angle
-
+from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle, draw_equilateral_triangle, draw_general_triangle, is_valid_triangle
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
