@@ -373,16 +373,6 @@ def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
 def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     """Enhanced normalization with parameter conversion and validation"""
     normalized = params.copy()
-
-    angles = normalized.pop('angles', None)
-    if angles is not None:
-        try:
-            if isinstance(angles, list) and len(angles) == 3:
-                angles = [float(a) for a in angles]
-                if math.isclose(sum(angles), 180, rel_tol=0.01):
-                    normalized['angles'] = angles
-        except (TypeError, ValueError) as e:
-            logging.warning(f"Invalid angles parameter: {e}")
             
      # Convert all values to floats first
     for k, v in list(normalized.items()):
@@ -396,17 +386,18 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
             del normalized[k]
             logging.warning(f"Removed non-numeric parameter: {k}={v}")
 
-    angles = normalized.get('angles')
-    if isinstance(angles, list):
+    if 'angles' in normalized:
         try:
-            normalized['angles'] = [float(a) for a in angles]
-            if sum(normalized['angles']) != 180:
-                del normalized['angles']
-        except:
+            if isinstance(normalized['angles'], list):
+                normalized['angles'] = [float(a) for a in normalized['angles']]
+                if not math.isclose(sum(normalized['angles']), 180, rel_tol=0.01):
+                    del normalized['angles']
+        except (TypeError, ValueError):
             del normalized['angles']
-    
+
+    # Handle 30-60-90 triangle logic first
     if shape_type == "right_triangle" and normalized.get('angles') == [30.0, 60.0, 90.0]:
-        # Set default hypotenuse if no sides provided
+        # Set default hypotenuse if no parameters provided
         if not any(k in normalized for k in ['side1', 'side2', 'hypotenuse']):
             normalized['hypotenuse'] = 2.0  # Default to hypotenuse=2 for ratio 1:√3:2
             
