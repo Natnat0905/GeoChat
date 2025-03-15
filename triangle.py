@@ -254,7 +254,7 @@ def draw_equilateral_triangle(side: float) -> str:
     plt.close()
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
-def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
+def draw_right_triangle(side1: float, side2: float, hypotenuse: float, angles: list = None) -> str:
     """Draw a right-angled triangle with validated parameters and clear labeling."""
     # Validate input parameters
     if None in (side1, side2, hypotenuse) or any(x <= 0 for x in (side1, side2, hypotenuse)):
@@ -292,6 +292,19 @@ def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
     ax.text(base/2, height/2, f'{hypotenuse} cm', ha='center', va='center', 
             color='red', rotation=45)  # Hypotenuse
     
+    # Label angles if provided (specifically for 30-60-90 triangle)
+    if angles and sorted(angles) == [30, 60, 90]:
+        ax.text(0, 0, '90°', ha='center', va='center', color='red')  # Right angle
+        shorter = min(side1, side2)
+        if shorter == side1:
+            # Shorter leg is horizontal (30° opposite)
+            ax.text(base - 0.5, 0.5, '60°', ha='center', va='center', color='red')
+            ax.text(0.5, height - 0.5, '30°', ha='center', va='center', color='red')
+        else:
+            # Shorter leg is vertical
+            ax.text(base - 0.5, 0.5, '30°', ha='center', va='center', color='red')
+            ax.text(0.5, height - 0.5, '60°', ha='center', va='center', color='red')
+    
     # Calculate and display area
     area = 0.5 * base * height
     ax.text(base/2, height + padding/4, 
@@ -300,7 +313,10 @@ def draw_right_triangle(side1: float, side2: float, hypotenuse: float) -> str:
             bbox=dict(boxstyle="round", fc="#f0f8ff", ec="#4682b4"))
     
     # Add title
-    ax.set_title(f"Right-Angled Triangle (Legs: {base} cm, {height} cm; Hypotenuse: {hypotenuse} cm)", pad=15)
+    title = f"Right-Angled Triangle (Legs: {base} cm, {height} cm; Hypotenuse: {hypotenuse} cm)"
+    if angles:
+        title += f" - {angles[0]}°-{angles[1]}°-{angles[2]}° Triangle"
+    ax.set_title(title, pad=15)
     
     # Save to base64
     buf = BytesIO()
@@ -354,46 +370,6 @@ def draw_similar_triangles(ratio: float, side1: float, side2: float) -> str:
     plt.close(fig)
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
-def draw_right_triangle_angle(side1: float, side2: float, hypotenuse: float, angles: list = None) -> str:
-    """Draw a right triangle with labeled angles for 30-60-90 triangles"""
-    fig, ax = plt.subplots()
-
-    # Assign base and height based on input
-    base, height = side1, side2  # Assuming side1 is horizontal and side2 is vertical
-
-    # Draw the triangle
-    ax.plot([0, base, 0, 0], [0, 0, height, 0], 'k-')
-
-    # Check if it's a 30-60-90 triangle
-    if angles and sorted(angles) == [30, 60, 90]:
-        ax.text(0, 0, '90°', ha='center', va='center', color='red')  # Right angle at origin
-
-        # Identify the shorter leg (opposite 30°) and longer leg (opposite 60°)
-        shorter, longer = min(side1, side2), max(side1, side2)
-        
-        if shorter == side1:  # Base is the shorter leg (opposite 30°)
-            ax.text(base - 1, 0.5, '60°', ha='center', va='center', color='red')  # Near base
-            ax.text(0.5, height - 1, '30°', ha='center', va='center', color='red')  # Near height
-        else:  # Base is the longer leg (opposite 60°)
-            ax.text(base - 1, 0.5, '30°', ha='center', va='center', color='red')
-            ax.text(0.5, height - 1, '60°', ha='center', va='center', color='red')
-
-    # Label the sides with angles
-    padding = 0.5  # Space for text
-    if angles and sorted(angles) == [30, 60, 90]:
-        base_label = f'{base} cm (60°)' if base > height else f'{base} cm (30°)'
-        height_label = f'{height} cm (30°)' if base > height else f'{height} cm (60°)'
-    else:
-        base_label = f'{base} cm'
-        height_label = f'{height} cm'
-
-    ax.text(base / 2, -padding / 3, base_label, ha='center', va='top', color='green')
-    ax.text(-padding / 3, height / 2, height_label, ha='right', va='center', color='green')
-
-    ax.set_xlim(-1, base + 1)
-    ax.set_ylim(-1, height + 1)
-    ax.set_aspect('equal')
-    plt.show()
 
 def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     """Enhanced normalization with parameter conversion and validation"""
@@ -420,6 +396,20 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
         elif not isinstance(v, (int, float)):
             del normalized[k]
             logging.warning(f"Removed non-numeric parameter: {k}={v}")
+    
+    if shape_type == "right_triangle" and params.get('angles') == [30.0, 60.0, 90.0]:
+        # Calculate sides based on 30-60-90 ratios
+        if 'hypotenuse' in params:
+            params['side1'] = params['hypotenuse'] / 2
+            params['side2'] = (params['hypotenuse'] * math.sqrt(3)) / 2
+        elif 'side1' in params:
+            params['hypotenuse'] = params['side1'] * 2
+            params['side2'] = params['side1'] * math.sqrt(3)
+        elif 'side2' in params:
+            params['hypotenuse'] = (params['side2'] * 2) / math.sqrt(3)
+            params['side1'] = params['side2'] / math.sqrt(3)
+        # Ensure angles are included
+        params['angles'] = [30.0, 60.0, 90.0]
     
     # Convert legacy parameter names for general triangles
     if shape_type == "general_triangle":

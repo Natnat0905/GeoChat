@@ -266,6 +266,11 @@ def handle_visualization(data: dict) -> JSONResponse:
 
         if not clean_params:
             return JSONResponse(content={"type": "error", "content": "Invalid parameters for drawing."}, status_code=400)
+        
+            # Handle right triangle angle labeling
+        if shape == "right_triangle" and 'angles' in clean_params:
+            # Ensure angles are passed to the drawing function
+            clean_params['angles'] = [float(a) for a in clean_params['angles']]
 
         visualization_mapping = {
             "circle": (draw_circle, ["radius"]),
@@ -288,6 +293,8 @@ def handle_visualization(data: dict) -> JSONResponse:
         # Extract the corresponding function and expected parameters
         viz_func, expected_params = visualization_mapping[shape]
         args = [clean_params.get(p) for p in expected_params]
+        if shape == "right_triangle" and 'angles' in clean_params:
+            args.append(clean_params['angles'])
 
         # Check if all expected parameters are available
         if None in args:
