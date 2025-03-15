@@ -132,7 +132,6 @@ def safe_eval_parameter(value: Any) -> Optional[float]:
             return [float(v) for v in value]
         except:
             return None
-        
     try:
         if isinstance(value, (int, float)):
             return float(value)

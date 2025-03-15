@@ -259,8 +259,14 @@ def draw_right_triangle(side1: float, side2: float, hypotenuse: float, angles: l
     # Validate input parameters
     if None in (side1, side2, hypotenuse) or any(x <= 0 for x in (side1, side2, hypotenuse)):
         raise ValueError("All sides must be positive numbers.")
-    if angles is None and math.isclose(side1*2, hypotenuse, rel_tol=0.01) and math.isclose(side2, side1*math.sqrt(3)): angles = [30.0, 60.0, 90.0]
-    
+    if angles is None: 
+        try:
+            if (math.isclose(side1*2, hypotenuse, rel_tol=0.01) and 
+                math.isclose(side2, side1*math.sqrt(3), rel_tol=0.01)):
+                angles = [30.0, 60.0, 90.0]
+        except TypeError:
+            pass
+        
     fig, ax = plt.subplots(figsize=(7, 7))
     ax.set_aspect('equal')
     
@@ -374,18 +380,21 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
     """Enhanced normalization with parameter conversion and validation"""
     normalized = params.copy()
 
-    angles = normalized.pop('angles', None)
-    if angles is not None:
+    # Preserve angles through conversion process
+    angles = normalized.get('angles')
+    if isinstance(angles, list):
         try:
-            if isinstance(angles, list) and len(angles) == 3:
-                angles = [float(a) for a in angles]
-                if math.isclose(sum(angles), 180, rel_tol=0.01):
-                    normalized['angles'] = angles
-        except (TypeError, ValueError) as e:
-            logging.warning(f"Invalid angles parameter: {e}")
-            
-     # Convert all values to floats first
+            normalized['angles'] = [float(a) for a in angles]
+            if not math.isclose(sum(normalized['angles']), 180, rel_tol=0.01):
+                del normalized['angles']
+        except (TypeError, ValueError):
+            del normalized['angles']
+
+    # Convert numeric parameters while preserving angles
     for k, v in list(normalized.items()):
+        if k == 'angles':  # Skip angle list from numeric check
+            continue
+            
         if isinstance(v, str):
             try:
                 normalized[k] = float(v)
@@ -395,15 +404,6 @@ def normalize_triangle_parameters(shape_type: str, params: dict) -> dict:
         elif not isinstance(v, (int, float)):
             del normalized[k]
             logging.warning(f"Removed non-numeric parameter: {k}={v}")
-
-    if 'angles' in normalized:
-        try:
-            if isinstance(normalized['angles'], list):
-                normalized['angles'] = [float(a) for a in normalized['angles']]
-                if not math.isclose(sum(normalized['angles']), 180, rel_tol=0.01):
-                    del normalized['angles']
-        except (TypeError, ValueError):
-            del normalized['angles']
 
     # Handle 30-60-90 triangle logic first
     if shape_type == "right_triangle" and normalized.get('angles') == [30.0, 60.0, 90.0]:
