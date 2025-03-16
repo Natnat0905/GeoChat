@@ -39,7 +39,28 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 class Message(BaseModel):
     user_message: str
 
-TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-related questions:
+TUTOR_PROMPT = """You are a high school math tutor specializing in algebra, geometry, and basic trigonometry. 
+Follow these rules strictly:
+
+1. Scope Restrictions:
+- Only cover topics up to Grade 12 level
+- NO calculus, linear algebra, or advanced topics
+- Focus on: Equations, inequalities, geometry, basic trigonometry, fractions, percentages
+
+2. Response Requirements:
+- Break down problems into 3-5 clear steps
+- Explain concepts using real-world examples
+- Highlight common mistakes
+- Use simple language with analogies
+
+3. Format Rules:
+- Use Markdown for formatting
+- Include step numbers
+- Put final answer in bold
+- For geometry problems:
+  - Include both explanation AND visualization
+  - Use EXACT JSON format with parameters
+  - Keep parameters numerical
 
 **Key Requirements:**
 1. Provide BOTH explanation AND visualization
@@ -115,11 +136,15 @@ SHAPE_NORMALIZATION_RULES["circle_angle"] = CIRCLE_NORMALIZATION_RULES["circle_a
 
 
 def enhance_explanation(response: str) -> str:
+    """Improved step-by-step formatting"""
     replacements = {
-        r"\\\(": "", r"\\\)": "",
-        r"\^2": "²", r"\^3": "³",
-        r"\sqrt": "√", r"\\times": "×",
-        r"\\div": "÷", r"\\frac{(\d+)}{(\d+)}": r"\1/\2"
+        r"\*\*Step (\d+):\*\*": r"\n**Step \1:**",
+        r"(\d+)cm\^2": r"\1cm²",
+        r"(\d+)deg": r"\1°",
+        r"\\times": "×",
+        r"\\div": "÷",
+        r"\\frac{(\w+)}{(\w+)}": r"\1/\2",
+        r"\s{2,}": "\n"  # Convert multiple spaces to newlines
     }
     for pattern, repl in replacements.items():
         response = re.sub(pattern, repl, response)
@@ -148,28 +173,38 @@ def get_tutor_response(user_message: str) -> dict:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": TUTOR_PROMPT},
-                {"role": "user", "content": user_message}
+                {
+                    "role": "system", 
+                    "content": TUTOR_PROMPT + "\nCurrent time: " + datetime.now().strftime("%Y-%m-%d %H:%M")
+                },
+                {
+                    "role": "user", 
+                    "content": f"Explain this in 3-5 steps: {user_message}"
+                }
             ],
-            max_tokens=650,
-            temperature=0.4
+            temperature=0.3,
+            max_tokens=800
         )
         
-        raw = response.choices[0].message.content.strip()
+        raw = response.choices[0].message.content
         
-        try:
-            json_response = json.loads(raw)
-            if isinstance(json_response, dict) and "shape" in json_response:
-                json_response["explanation"] = enhance_explanation(json_response["explanation"])
-                return json_response
-        except json.JSONDecodeError:
-            pass
+        # First try to extract JSON if present
+        json_match = re.search(r'\{.*?\}', raw, re.DOTALL)
+        if json_match:
+            try:
+                json_response = json.loads(json_match.group())
+                if "shape" in json_response:
+                    json_response["explanation"] = enhance_explanation(raw)
+                    return json_response
+            except json.JSONDecodeError:
+                pass
         
+        # If no JSON, return formatted explanation
         return {"response": enhance_explanation(raw)}
     
     except Exception as e:
         logging.error(f"GPT Error: {e}")
-        return {"response": "Let's try to work through this problem together. First..."}
+        return {"response": "Let's break this down step by step..."}
 
 @app.post("/chat")
 async def tutor_endpoint(message: Message):
