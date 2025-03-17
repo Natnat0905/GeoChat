@@ -23,6 +23,7 @@ from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_pa
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
 from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle, draw_equilateral_triangle, draw_general_triangle, is_valid_triangle
+from datetime import datetime
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -171,7 +172,7 @@ def safe_eval_parameter(value: Any) -> Optional[float]:
 def get_tutor_response(user_message: str) -> dict:
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             messages=[
                 {
                     "role": "system", 
