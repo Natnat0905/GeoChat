@@ -166,23 +166,48 @@ def safe_eval_parameter(value: Any) -> Optional[float]:
 
 def get_tutor_response(user_message: str) -> dict:
     try:
+        # Hybrid prompt for speed and quality
+        optimized_prompt = """Math Tutor: Combine clear explanations with strict JSON formatting.
+        [RULES]
+        1. Respond in EXACT format: { 
+            "explanation": "Step-by-step text", 
+            "shape": "geometry_type", 
+            "parameters": {numerical_values}
+        }
+        2. Supported shapes: circle, rectangle, triangle variants
+        3. Parameter examples:
+           - Circle: {"radius": 5}
+           - Rectangle: {"width":4, "height":5}
+           - Right Triangle: {"side1":3, "side2":4, "angles":[90,53.13,36.87]}
+        4. Keep explanations under 5 steps
+        5. Always include both explanation and visualization for geometry
+        """
+
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": TUTOR_PROMPT},
+                {"role": "system", "content": optimized_prompt},
                 {"role": "user", "content": user_message}
             ],
-            max_tokens=650,
-            temperature=0.4
+            temperature=0.3,
+            max_tokens=700,
+            request_timeout=15  # Add timeout
         )
         
-        raw = response.choices[0].message.content.strip()
+        raw = response.choices[0].message.content
+        
+        # Improved JSON extraction
+        json_match = re.search(r'\{.*?\}', raw, re.DOTALL)
+        json_str = json_match.group() if json_match else raw
         
         try:
-            json_response = json.loads(raw)
-            if isinstance(json_response, dict) and "shape" in json_response:
-                json_response["explanation"] = enhance_explanation(json_response["explanation"])
-                return json_response
+            json_response = json.loads(json_str)
+            if "shape" in json_response:
+                return {
+                    "explanation": enhance_explanation(json_response.get("explanation", "")),
+                    "shape": json_response["shape"],
+                    "parameters": json_response.get("parameters", {})
+                }
         except json.JSONDecodeError:
             pass
         
@@ -191,6 +216,23 @@ def get_tutor_response(user_message: str) -> dict:
     except Exception as e:
         logging.error(f"GPT Error: {e}")
         return {"response": "Let's try to work through this problem together. First..."}
+
+def get_fallback_response(user_message: str) -> dict:
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Provide math explanations with JSON formatting"},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.4,
+            max_tokens=600,
+            request_timeout=10
+        )
+        # Process response similarly...
+        
+    except Exception as e:
+        return {"response": "Temporarily unavailable. Please try again."}
 
 @app.post("/chat")
 async def tutor_endpoint(message: Message):
