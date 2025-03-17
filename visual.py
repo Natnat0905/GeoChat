@@ -39,7 +39,28 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 class Message(BaseModel):
     user_message: str
 
-TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-related questions:
+TUTOR_PROMPT = """You are a high school math tutor specializing in algebra, geometry, and basic trigonometry. 
+Follow these rules strictly:
+
+1. Scope Restrictions:
+- Only cover topics up to Grade 10 level
+- NO calculus, linear algebra, or advanced topics
+- Focus on: Equations, inequalities, geometry, basic trigonometry, fractions, percentages
+
+2. Response Requirements:
+- Break down problems into 3-5 clear steps
+- Explain concepts using real-world examples
+- Highlight common mistakes
+- Use simple language with analogies
+
+3. Format Rules:
+- Use Markdown for formatting
+- Include step numbers
+- Put final answer in bold
+- For geometry problems:
+  - Include both explanation AND visualization
+  - Use EXACT JSON format with parameters
+  - Keep parameters numerical
 
 **Key Requirements:**
 1. Provide BOTH explanation AND visualization
@@ -146,7 +167,7 @@ def safe_eval_parameter(value: Any) -> Optional[float]:
 def get_tutor_response(user_message: str) -> dict:
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": TUTOR_PROMPT},
                 {"role": "user", "content": user_message}
