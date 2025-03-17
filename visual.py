@@ -229,10 +229,28 @@ def get_fallback_response(user_message: str) -> dict:
             max_tokens=600,
             request_timeout=10
         )
-        # Process response similarly...
+        raw = response.choices[0].message.content
         
+        # Improved JSON extraction
+        json_match = re.search(r'\{.*?\}', raw, re.DOTALL)
+        json_str = json_match.group() if json_match else raw
+        
+        try:
+            json_response = json.loads(json_str)
+            if "shape" in json_response:
+                return {
+                    "explanation": enhance_explanation(json_response.get("explanation", "")),
+                    "shape": json_response["shape"],
+                    "parameters": json_response.get("parameters", {})
+                }
+        except json.JSONDecodeError:
+            pass
+        
+        return {"response": enhance_explanation(raw)}
+    
     except Exception as e:
-        return {"response": "Temporarily unavailable. Please try again."}
+        logging.error(f"GPT Error: {e}")
+        return {"response": "Let's try to work through this problem together. First..."}
 
 @app.post("/chat")
 async def tutor_endpoint(message: Message):
@@ -412,7 +430,3 @@ def handle_visualization(data: dict) -> JSONResponse:
     except Exception as e:
         logging.error(f"Visualization Error: {e}")
         return JSONResponse(content={"type": "error", "content": "Error generating image."}, status_code=500)
-
-@app.get("/health")
-async def health_check():
-    return {"status": "active", "service": "Math Tutor API v2.0"}
