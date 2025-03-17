@@ -214,13 +214,13 @@ def get_tutor_response(user_message: str) -> dict:
 @app.post("/chat")
 async def tutor_endpoint(message: Message):
     try:
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, get_tutor_response, user_input)
-
+        # Get user input FIRST
         user_input = message.user_message
         logging.info(f"Tutoring request: {user_input}")
 
-        response = get_tutor_response(user_input)
+        # THEN process the request
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, get_tutor_response, user_input)
 
         should_draw = any(keyword in user_input.lower() for keyword in ["draw", "illustrate", "sketch", "visualize"])
 
@@ -229,7 +229,6 @@ async def tutor_endpoint(message: Message):
                 None, normalize_parameters, response["shape"], response.get("parameters", {})
             )
             if should_draw:
-                # Call the function to generate visualization for the shape
                 return handle_visualization({"shape": response["shape"], "parameters": normalized_params, "explanation": response.get("explanation", "")})
             else:
                 return JSONResponse(content={"type": "text", "content": response.get("explanation", "Let's work through this step by step...")})
