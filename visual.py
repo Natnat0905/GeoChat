@@ -23,7 +23,7 @@ from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_pa
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
 from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle, draw_equilateral_triangle, draw_general_triangle, is_valid_triangle
-from datetime import datetime
+import asyncio
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -178,7 +178,7 @@ def get_tutor_response(user_message: str) -> dict:
             messages=[
                 {
                     "role": "system", 
-                    "content": TUTOR_PROMPT + "\nCurrent time: " + datetime.now().strftime("%Y-%m-%d %H:%M")
+                    "content": TUTOR_PROMPT
                 },
                 {
                     "role": "user", 
@@ -186,7 +186,8 @@ def get_tutor_response(user_message: str) -> dict:
                 }
             ],
             temperature=0.3,
-            max_tokens=800
+            max_tokens=800,
+            request_timeout=15  # Added timeout
         )
         
         raw = response.choices[0].message.content
@@ -195,12 +196,13 @@ def get_tutor_response(user_message: str) -> dict:
         json_match = re.search(r'\{.*?\}', raw, re.DOTALL)
         if json_match:
             try:
-                json_response = json.loads(json_match.group())
+                json_response = json.loads(raw)
                 if "shape" in json_response:
                     json_response["explanation"] = enhance_explanation(raw)
                     return json_response
             except json.JSONDecodeError:
-                pass
+                # Fallback to text response if JSON parsing fails
+                return {"response": enhance_explanation(raw)}
         
         # If no JSON, return formatted explanation
         return {"response": enhance_explanation(raw)}
@@ -212,6 +214,9 @@ def get_tutor_response(user_message: str) -> dict:
 @app.post("/chat")
 async def tutor_endpoint(message: Message):
     try:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, get_tutor_response, user_input)
+
         user_input = message.user_message
         logging.info(f"Tutoring request: {user_input}")
 
@@ -220,8 +225,9 @@ async def tutor_endpoint(message: Message):
         should_draw = any(keyword in user_input.lower() for keyword in ["draw", "illustrate", "sketch", "visualize"])
 
         if "shape" in response:
-            # Normalize the parameters and handle visualization if required
-            normalized_params = normalize_parameters(response["shape"], response.get("parameters", {}))
+            normalized_params = await loop.run_in_executor(
+                None, normalize_parameters, response["shape"], response.get("parameters", {})
+            )
             if should_draw:
                 # Call the function to generate visualization for the shape
                 return handle_visualization({"shape": response["shape"], "parameters": normalized_params, "explanation": response.get("explanation", "")})
@@ -374,12 +380,19 @@ def handle_visualization(data: dict) -> JSONResponse:
             )
 
         # Return FULL base64 string with prefix
-        return JSONResponse(content={
-            "type": "visual",
-            "explanation": explanation,
-            "image": img_base64,  # Keep the full data URL
-            "parameters": clean_params
-        })
+        try:
+            img_base64 = viz_func(*args)
+            return JSONResponse(content={
+                "type": "visual",
+                "explanation": explanation,
+                "image": img_base64.split(",")[-1],  # Return only base64 payload
+                "parameters": clean_params
+            })
+        except ValueError as ve:
+            return JSONResponse(
+                content={"type": "error", "content": str(ve)},
+                status_code=400
+            )
 
     except Exception as e:
         logging.error(f"Visualization Error: {e}")
