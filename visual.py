@@ -53,15 +53,6 @@ Follow these rules strictly:
 - Highlight common mistakes
 - Use simple language with analogies
 
-3. Format Rules:
-- Use Markdown for formatting
-- Include step numbers
-- Put final answer in bold
-- For geometry problems:
-  - Include both explanation AND visualization
-  - Use EXACT JSON format with parameters
-  - Keep parameters numerical
-
 **Key Requirements:**
 1. Provide BOTH explanation AND visualization
 2. Use EXACT JSON format:
@@ -167,26 +158,11 @@ def safe_eval_parameter(value: Any) -> Optional[float]:
 def get_tutor_response(user_message: str) -> dict:
     try:
         # Hybrid prompt for speed and quality
-        optimized_prompt = """Math Tutor: Combine clear explanations with strict JSON formatting.
-        [RULES]
-        1. Respond in EXACT format: { 
-            "explanation": "Step-by-step text", 
-            "shape": "geometry_type", 
-            "parameters": {numerical_values}
-        }
-        2. Supported shapes: circle, rectangle, triangle variants
-        3. Parameter examples:
-           - Circle: {"radius": 5}
-           - Rectangle: {"width":4, "height":5}
-           - Right Triangle: {"side1":3, "side2":4, "angles":[90,53.13,36.87]}
-        4. Keep explanations under 5 steps
-        5. Always include both explanation and visualization for geometry
-        """
+        
 
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": optimized_prompt},
                 {"role": "user", "content": user_message}
             ],
             temperature=0.3,
