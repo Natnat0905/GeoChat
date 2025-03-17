@@ -23,7 +23,6 @@ from circle import (draw_circle, CIRCLE_NORMALIZATION_RULES, normalize_circle_pa
 from rectangle import (draw_rectangle, RECTANGLE_NORMALIZATION_RULES, normalize_square_parameters)
 from illustration import (draw_right_triangle, plot_trigonometric_function)
 from triangle import TRIANGLE_NORMALIZATION_RULES, draw_similar_triangles, normalize_triangle_parameters, draw_right_triangle, draw_equilateral_triangle, draw_general_triangle, is_valid_triangle
-import asyncio
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -40,28 +39,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 class Message(BaseModel):
     user_message: str
 
-TUTOR_PROMPT = """You are a high school math tutor specializing in algebra, geometry, and basic trigonometry. 
-Follow these rules strictly:
-
-1. Scope Restrictions:
-- Only cover topics up to Grade 10 level
-- NO calculus, linear algebra, or advanced topics
-- Focus on: Equations, inequalities, geometry, basic trigonometry, fractions, percentages
-
-2. Response Requirements:
-- Break down problems into 3-5 clear steps
-- Explain concepts using real-world examples
-- Highlight common mistakes
-- Use simple language with analogies
-
-3. Format Rules:
-- Use Markdown for formatting
-- Include step numbers
-- Put final answer in bold
-- For geometry problems:
-  - Include both explanation AND visualization
-  - Use EXACT JSON format with parameters
-  - Keep parameters numerical
+TUTOR_PROMPT = """You are a math tutor specializing in geometry. For shape-related questions:
 
 **Key Requirements:**
 1. Provide BOTH explanation AND visualization
@@ -137,21 +115,15 @@ SHAPE_NORMALIZATION_RULES["circle_angle"] = CIRCLE_NORMALIZATION_RULES["circle_a
 
 
 def enhance_explanation(response: str) -> str:
-    """Improved step-by-step formatting without markdown"""
     replacements = {
-        r"\*\*Step (\d+):\*\*": r"\nStep \1:",  # Remove bold markers
-        r"\*\*([^:]+):\*\*": r"\1:",            # Remove other bold markers
-        r"(\d+)cm\^2": r"\1cm²",
-        r"(\d+)deg": r"\1°",
-        r"\\times": "×",
-        r"\\div": "÷",
-        r"\\frac{(\w+)}{(\w+)}": r"\1/\2",
-        r"\s{2,}": "\n",
-        r"\*": ""                               # Remove any remaining asterisks
+        r"\\\(": "", r"\\\)": "",
+        r"\^2": "²", r"\^3": "³",
+        r"\sqrt": "√", r"\\times": "×",
+        r"\\div": "÷", r"\\frac{(\d+)}{(\d+)}": r"\1/\2"
     }
     for pattern, repl in replacements.items():
         response = re.sub(pattern, repl, response)
-    return response.strip()
+    return response
 
 def safe_eval_parameter(value: Any) -> Optional[float]:
     """Safely evaluate mathematical expressions with π support, handling both strings and numbers."""
@@ -174,61 +146,46 @@ def safe_eval_parameter(value: Any) -> Optional[float]:
 def get_tutor_response(user_message: str) -> dict:
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
-                {
-                    "role": "system", 
-                    "content": TUTOR_PROMPT
-                },
-                {
-                    "role": "user", 
-                    "content": f"Explain this in 3-5 steps: {user_message}"
-                }
+                {"role": "system", "content": TUTOR_PROMPT},
+                {"role": "user", "content": user_message}
             ],
-            temperature=0.3,
-            max_tokens=800,
-            request_timeout=15  # Added timeout
+            max_tokens=650,
+            temperature=0.4
         )
         
-        raw = response.choices[0].message.content
+        raw = response.choices[0].message.content.strip()
         
-        # First try to extract JSON if present
-        json_match = re.search(r'\{.*?\}', raw, re.DOTALL)
-        if json_match:
-            try:
-                json_response = json.loads(raw)
-                if "shape" in json_response:
-                    json_response["explanation"] = enhance_explanation(raw)
-                    return json_response
-            except json.JSONDecodeError:
-                # Fallback to text response if JSON parsing fails
-                return {"response": enhance_explanation(raw)}
+        try:
+            json_response = json.loads(raw)
+            if isinstance(json_response, dict) and "shape" in json_response:
+                json_response["explanation"] = enhance_explanation(json_response["explanation"])
+                return json_response
+        except json.JSONDecodeError:
+            pass
         
-        # If no JSON, return formatted explanation
         return {"response": enhance_explanation(raw)}
     
     except Exception as e:
         logging.error(f"GPT Error: {e}")
-        return {"response": "Let's break this down step by step..."}
+        return {"response": "Let's try to work through this problem together. First..."}
 
 @app.post("/chat")
 async def tutor_endpoint(message: Message):
     try:
-        # Get user input FIRST
         user_input = message.user_message
         logging.info(f"Tutoring request: {user_input}")
 
-        # THEN process the request
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, get_tutor_response, user_input)
+        response = get_tutor_response(user_input)
 
         should_draw = any(keyword in user_input.lower() for keyword in ["draw", "illustrate", "sketch", "visualize"])
 
         if "shape" in response:
-            normalized_params = await loop.run_in_executor(
-                None, normalize_parameters, response["shape"], response.get("parameters", {})
-            )
+            # Normalize the parameters and handle visualization if required
+            normalized_params = normalize_parameters(response["shape"], response.get("parameters", {}))
             if should_draw:
+                # Call the function to generate visualization for the shape
                 return handle_visualization({"shape": response["shape"], "parameters": normalized_params, "explanation": response.get("explanation", "")})
             else:
                 return JSONResponse(content={"type": "text", "content": response.get("explanation", "Let's work through this step by step...")})
@@ -363,10 +320,11 @@ def handle_visualization(data: dict) -> JSONResponse:
             if shape == "circle":
                 img_base64 = draw_circle(clean_params["radius"])
             elif shape == "general_triangle":
+                # Special handling for triangle validation
                 sides = [clean_params["side_a"], clean_params["side_b"], clean_params["side_c"]]
                 if not is_valid_triangle(sides):
                     return JSONResponse(
-                        content={"type": "error", "content": "Invalid triangle dimensions"},
+                        content={"type": "error", "content": "Invalid triangle dimensions - violates triangle inequality"},
                         status_code=400
                     )
                 img_base64 = viz_func(*args)
@@ -378,25 +336,20 @@ def handle_visualization(data: dict) -> JSONResponse:
                 status_code=400
             )
 
-        # Return FULL base64 string with prefix
-        try:
-            img_base64 = viz_func(*args)
-            return JSONResponse(content={
-                "type": "visual",
-                "explanation": explanation,
-                "image": img_base64.split(",")[-1],  # Return only base64 payload
-                "parameters": clean_params
-            })
-        except ValueError as ve:
-            return JSONResponse(
-                content={"type": "error", "content": str(ve)},
-                status_code=400
-            )
+        # Clean the base64 string to remove prefix
+        clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
+
+        return JSONResponse(content={
+            "type": "visual",
+            "explanation": explanation,
+            "image": clean_base64,
+            "parameters": clean_params
+        })
 
     except Exception as e:
         logging.error(f"Visualization Error: {e}")
         return JSONResponse(content={"type": "error", "content": "Error generating image."}, status_code=500)
-    
+
 @app.get("/health")
 async def health_check():
     return {"status": "active", "service": "Math Tutor API v2.0"}
