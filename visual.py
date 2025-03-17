@@ -39,23 +39,14 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 class Message(BaseModel):
     user_message: str
 
-TUTOR_PROMPT = """You are a high school math tutor. Follow these STRICT RULES:
+TUTOR_PROMPT = """You are a HIGH SCHOOL MATH tutor. Follow these STRICT RULES:
+1. Only answer questions related to:
+   - Algebra (equations, inequalities)
+   - Geometry (shapes, angles, areas)
+   - Trigonometry (right triangles, basic identities)
+   - Grade 7-10 curriculum
 
-1. Analyze if the user's question meets ALL criteria:
-   - Is a mathematics problem
-   - Falls under high school level (Grades 9-12)
-   - Covers: Algebra, Geometry, Trigonometry, or Basic Calculus
-   
-2. If NOT a valid math question, respond EXACTLY:
-{
-  "error": "I specialize in high school math questions only"
-}
-
-3. Response Requirements:
-- Break down problems into 3-5 clear steps
-- Explain concepts using real-world examples
-- Highlight common mistakes
-- Use simple language with analogies
+You are a math tutor specializing in geometry. For shape-related questions:
 
 **Key Requirements:**
 1. Provide BOTH explanation AND visualization
@@ -161,71 +152,23 @@ def safe_eval_parameter(value: Any) -> Optional[float]:
 
 def get_tutor_response(user_message: str) -> dict:
     try:
-        # Hybrid prompt for speed and quality
-        system_msg = """You are a MATH specialist. Follow these rules:
-        1. Only answer math questions
-        2. Supported shapes: circle, rectangle, triangle variants
-        3. For non-math queries: {"response": "I specialize in math questions"}"""
-
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
+                {"role": "system", "content": TUTOR_PROMPT},
                 {"role": "user", "content": user_message}
             ],
-            temperature=0.3,
-            max_tokens=700,
-            request_timeout=15  # Add timeout
+            max_tokens=650,
+            temperature=0.4
         )
         
-        raw = response.choices[0].message.content
-        
-        # Improved JSON extraction
-        json_match = re.search(r'\{.*?\}', raw, re.DOTALL)
-        json_str = json_match.group() if json_match else raw
+        raw = response.choices[0].message.content.strip()
         
         try:
-            json_response = json.loads(json_str)
-            if "shape" in json_response:
-                return {
-                    "explanation": enhance_explanation(json_response.get("explanation", "")),
-                    "shape": json_response["shape"],
-                    "parameters": json_response.get("parameters", {})
-                }
-        except json.JSONDecodeError:
-            pass
-        
-        return {"response": enhance_explanation(raw)}
-    
-    except Exception as e:
-        logging.error(f"GPT Error: {e}")
-        return {"response": "Let's try to work through this problem together. First..."}
-
-def get_fallback_response(user_message: str) -> dict:
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Provide math explanations with JSON formatting"},
-                {"role": "user", "content": user_message}
-            ],
-            temperature=0.4,
-            max_tokens=600,
-            request_timeout=10
-        )
-        raw = response.choices[0].message.content
-        
-        # Improved JSON extraction
-        json_match = re.search(r'\{.*?\}', raw, re.DOTALL)
-        json_str = json_match.group() if json_match else raw
-        
-        try:
-            json_response = json.loads(json_str)
-            if "shape" in json_response:
-                return {
-                    "explanation": enhance_explanation(json_response.get("explanation", "")),
-                    "shape": json_response["shape"],
-                    "parameters": json_response.get("parameters", {})
-                }
+            json_response = json.loads(raw)
+            if isinstance(json_response, dict) and "shape" in json_response:
+                json_response["explanation"] = enhance_explanation(json_response["explanation"])
+                return json_response
         except json.JSONDecodeError:
             pass
         
@@ -413,3 +356,7 @@ def handle_visualization(data: dict) -> JSONResponse:
     except Exception as e:
         logging.error(f"Visualization Error: {e}")
         return JSONResponse(content={"type": "error", "content": "Error generating image."}, status_code=500)
+
+@app.get("/health")
+async def health_check():
+    return {"status": "active", "service": "Math Tutor API v2.0"}
