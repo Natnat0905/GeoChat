@@ -41,8 +41,7 @@ def draw_circle(radius: float) -> str:
     plt.close(fig)
     buf.seek(0)
     img_base64 = base64.b64encode(buf.read()).decode('utf-8')
-
-    return f"data:image/png;base64,{img_base64}"
+    return f"data:image/png;base64,{img_base64}"  # Keep prefix for proper image handling
 
 def normalize_circle_parameters(params: dict) -> dict:
     """

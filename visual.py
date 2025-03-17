@@ -137,19 +137,21 @@ SHAPE_NORMALIZATION_RULES["circle_angle"] = CIRCLE_NORMALIZATION_RULES["circle_a
 
 
 def enhance_explanation(response: str) -> str:
-    """Improved step-by-step formatting"""
+    """Improved step-by-step formatting without markdown"""
     replacements = {
-        r"\*\*Step (\d+):\*\*": r"\n**Step \1:**",
+        r"\*\*Step (\d+):\*\*": r"\nStep \1:",  # Remove bold markers
+        r"\*\*([^:]+):\*\*": r"\1:",            # Remove other bold markers
         r"(\d+)cm\^2": r"\1cm²",
         r"(\d+)deg": r"\1°",
         r"\\times": "×",
         r"\\div": "÷",
         r"\\frac{(\w+)}{(\w+)}": r"\1/\2",
-        r"\s{2,}": "\n"  # Convert multiple spaces to newlines
+        r"\s{2,}": "\n",
+        r"\*": ""                               # Remove any remaining asterisks
     }
     for pattern, repl in replacements.items():
         response = re.sub(pattern, repl, response)
-    return response
+    return response.strip()
 
 def safe_eval_parameter(value: Any) -> Optional[float]:
     """Safely evaluate mathematical expressions with π support, handling both strings and numbers."""
@@ -356,11 +358,10 @@ def handle_visualization(data: dict) -> JSONResponse:
             if shape == "circle":
                 img_base64 = draw_circle(clean_params["radius"])
             elif shape == "general_triangle":
-                # Special handling for triangle validation
                 sides = [clean_params["side_a"], clean_params["side_b"], clean_params["side_c"]]
                 if not is_valid_triangle(sides):
                     return JSONResponse(
-                        content={"type": "error", "content": "Invalid triangle dimensions - violates triangle inequality"},
+                        content={"type": "error", "content": "Invalid triangle dimensions"},
                         status_code=400
                     )
                 img_base64 = viz_func(*args)
@@ -372,20 +373,18 @@ def handle_visualization(data: dict) -> JSONResponse:
                 status_code=400
             )
 
-        # Clean the base64 string to remove prefix
-        clean_base64 = img_base64.split(",")[-1] if img_base64 else ""
-
+        # Return FULL base64 string with prefix
         return JSONResponse(content={
             "type": "visual",
             "explanation": explanation,
-            "image": clean_base64,
+            "image": img_base64,  # Keep the full data URL
             "parameters": clean_params
         })
 
     except Exception as e:
         logging.error(f"Visualization Error: {e}")
         return JSONResponse(content={"type": "error", "content": "Error generating image."}, status_code=500)
-
+    
 @app.get("/health")
 async def health_check():
     return {"status": "active", "service": "Math Tutor API v2.0"}
