@@ -153,7 +153,7 @@ def safe_eval_parameter(value: Any) -> Optional[float]:
 def get_tutor_response(user_message: str) -> dict:
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": TUTOR_PROMPT},
                 {"role": "user", "content": user_message}
